@@ -1,0 +1,108 @@
+import React, { useCallback, useState } from 'react';
+import { View, Text, FlatList, TouchableOpacity } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter, useFocusEffect } from 'expo-router';
+import { format } from 'date-fns';
+import { Badge } from '@peptpal/ui';
+import { estimateRemainingDoses } from '@peptpal/core';
+import { getInventoryItems, softDeleteInventoryItem } from '../../../src/db/inventory';
+import type { InventoryItem } from '@peptpal/core';
+
+type InventoryStatus = 'Sealed' | 'Reconstituted' | 'Low' | 'Expired';
+
+function getStatus(item: InventoryItem): InventoryStatus {
+  if (item.expiry_at && new Date(item.expiry_at) < new Date()) return 'Expired';
+  if (!item.reconstituted) return 'Sealed';
+  if (item.concentration_mcg_per_ml && item.vial_count > 0) {
+    // Assume each vial is ~2mL after reconstitution for estimation
+    const remaining = estimateRemainingDoses(item.concentration_mcg_per_ml, 2 * item.vial_count, 250);
+    if (remaining < 3) return 'Low';
+  }
+  return 'Reconstituted';
+}
+
+const statusBadgeVariant: Record<InventoryStatus, 'default' | 'success' | 'warning' | 'danger' | 'info'> = {
+  Sealed: 'info',
+  Reconstituted: 'success',
+  Low: 'warning',
+  Expired: 'danger',
+};
+
+export default function InventoryScreen() {
+  const router = useRouter();
+  const [items, setItems] = useState<InventoryItem[]>([]);
+
+  const load = useCallback(async () => {
+    const data = await getInventoryItems();
+    setItems(data);
+  }, []);
+
+  useFocusEffect(useCallback(() => { void load(); }, [load]));
+
+  return (
+    <SafeAreaView className="flex-1 bg-surface" edges={['bottom']}>
+      <FlatList
+        data={items}
+        keyExtractor={(item) => String(item.id)}
+        contentContainerStyle={{ padding: 16 }}
+        ListHeaderComponent={
+          <TouchableOpacity
+            className="bg-primary-600 rounded-xl py-3 items-center mb-4 active:bg-primary-700"
+            onPress={() => router.push('/(tabs)/inventory/new' as never)}
+          >
+            <Text className="text-white font-bold">+ Add Vial</Text>
+          </TouchableOpacity>
+        }
+        renderItem={({ item }) => {
+          const status = getStatus(item);
+          return (
+            <TouchableOpacity
+              className="bg-surface-card rounded-2xl mb-3 p-4 active:bg-surface-elevated"
+              onPress={() => router.push(`/(tabs)/inventory/${item.id}`)}
+              activeOpacity={0.85}
+            >
+              <View className="flex-row justify-between items-start">
+                <View className="flex-1">
+                  <Text className="text-white font-bold text-base">{item.peptide_name}</Text>
+                  <Text className="text-slate-400 text-xs mt-0.5">
+                    {item.vial_count} × {item.vial_size_mg}mg vial{item.vial_count !== 1 ? 's' : ''}
+                  </Text>
+                </View>
+                <Badge variant={statusBadgeVariant[status]}>{status}</Badge>
+              </View>
+
+              <View className="mt-3 flex-row flex-wrap gap-3">
+                {item.concentration_mcg_per_ml != null && (
+                  <InfoChip label="Conc." value={`${item.concentration_mcg_per_ml} mcg/mL`} />
+                )}
+                <InfoChip label="Storage" value={item.storage_location === 'freezer' ? '❄ Freezer' : '🧊 Fridge'} />
+                {item.expiry_at && (
+                  <InfoChip
+                    label="Expires"
+                    value={format(new Date(item.expiry_at), 'MMM d, yyyy')}
+                    alert={new Date(item.expiry_at) < new Date()}
+                  />
+                )}
+              </View>
+            </TouchableOpacity>
+          );
+        }}
+        ListEmptyComponent={
+          <View className="items-center py-16">
+            <Text className="text-slate-500 text-base">No inventory yet</Text>
+            <Text className="text-slate-600 text-sm mt-1">Add a vial to get started</Text>
+          </View>
+        }
+      />
+    </SafeAreaView>
+  );
+}
+
+function InfoChip({ label, value, alert }: { label: string; value: string; alert?: boolean }) {
+  return (
+    <View>
+      <Text className="text-slate-500 text-xs">{label}</Text>
+      <Text className={`text-xs font-medium ${alert ? 'text-danger-400' : 'text-slate-300'}`}>{value}</Text>
+    </View>
+  );
+}

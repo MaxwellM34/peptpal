@@ -1,0 +1,101 @@
+import React, { useState, useCallback, useEffect } from 'react';
+import { View, Text, FlatList, TouchableOpacity } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter, useFocusEffect } from 'expo-router';
+import { format } from 'date-fns';
+import { Badge } from '@peptpal/ui';
+import { getInjectionLogs, softDeleteInjectionLog } from '../../../src/db/injectionLog';
+import type { InjectionLog } from '@peptpal/core';
+
+export default function LogHistoryScreen() {
+  const router = useRouter();
+  const [logs, setLogs] = useState<InjectionLog[]>([]);
+
+  const load = useCallback(async () => {
+    const data = await getInjectionLogs();
+    setLogs(data);
+  }, []);
+
+  useFocusEffect(useCallback(() => { void load(); }, [load]));
+
+  async function handleDelete(id: number) {
+    await softDeleteInjectionLog(id);
+    await load();
+  }
+
+  return (
+    <SafeAreaView className="flex-1 bg-surface" edges={['bottom']}>
+      <FlatList
+        data={logs}
+        keyExtractor={(item) => String(item.id)}
+        contentContainerStyle={{ padding: 16 }}
+        ListHeaderComponent={
+          <TouchableOpacity
+            className="bg-primary-600 rounded-xl py-3 items-center mb-4 active:bg-primary-700"
+            onPress={() => router.push('/(tabs)/log/new')}
+          >
+            <Text className="text-white font-bold">+ Log Injection</Text>
+          </TouchableOpacity>
+        }
+        renderItem={({ item }) => <LogItem log={item} onDelete={() => handleDelete(item.id)} />}
+        ListEmptyComponent={
+          <View className="items-center py-16">
+            <Text className="text-slate-500 text-base">No injections logged yet</Text>
+            <Text className="text-slate-600 text-sm mt-1">Tap the button above to get started</Text>
+          </View>
+        }
+      />
+    </SafeAreaView>
+  );
+}
+
+function LogItem({ log, onDelete }: { log: InjectionLog; onDelete: () => void }) {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <TouchableOpacity
+      className="bg-surface-card rounded-2xl mb-3 overflow-hidden"
+      onPress={() => setExpanded(!expanded)}
+      activeOpacity={0.85}
+    >
+      <View className="px-4 py-3 flex-row items-start justify-between">
+        <View className="flex-1">
+          <Text className="text-white font-bold">{log.peptide_name}</Text>
+          <Text className="text-slate-400 text-xs mt-0.5">
+            {format(new Date(log.injected_at), 'MMM d, yyyy · h:mm a')}
+          </Text>
+        </View>
+        <View className="items-end gap-1">
+          <Text className="text-primary-400 font-bold">{log.dose_mcg} mcg</Text>
+          {log.dose_ml != null && (
+            <Text className="text-slate-500 text-xs">{log.dose_ml} mL</Text>
+          )}
+        </View>
+      </View>
+
+      {expanded && (
+        <View className="px-4 pb-4 border-t border-surface-border pt-3 gap-2">
+          {log.injection_site && (
+            <DetailRow label="Site" value={log.injection_site.replace(/_/g, ' ')} />
+          )}
+          {log.notes && <DetailRow label="Notes" value={log.notes} />}
+          <TouchableOpacity
+            className="mt-2 py-2 border border-danger-700 rounded-xl items-center"
+            onPress={onDelete}
+          >
+            <Text className="text-danger-400 text-sm">Delete</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+    </TouchableOpacity>
+  );
+}
+
+function DetailRow({ label, value }: { label: string; value: string }) {
+  return (
+    <View className="flex-row gap-2">
+      <Text className="text-slate-500 text-xs w-14 flex-shrink-0">{label}</Text>
+      <Text className="text-slate-300 text-xs flex-1 capitalize">{value}</Text>
+    </View>
+  );
+}

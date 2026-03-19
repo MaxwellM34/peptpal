@@ -1,0 +1,16 @@
+[tool.aerich]
+tortoise_orm = "app.config.TORTOISE_ORM"
+location = "./migrations"
+src_folder = "./."
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = ["E501"]
+
+[tool.black]
+line-length = 100
+target-version = ["py312"]
