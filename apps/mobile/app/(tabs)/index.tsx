@@ -1,9 +1,10 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
+import { Platform, View, Text, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { format } from 'date-fns';
 import { Card, Badge } from '@peptpal/ui';
+import { isDbAvailable } from '../../src/db/client';
 import { getInjectionLogs } from '../../src/db/injectionLog';
 import { getSymptomLogs } from '../../src/db/symptomLog';
 import { getSchedules } from '../../src/db/schedules';
@@ -19,6 +20,7 @@ export default function DashboardScreen() {
   const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
+    if (!isDbAvailable()) return;
     const [logs, symptoms, scheds, inv] = await Promise.all([
       getInjectionLogs({ limit: 3 }),
       getSymptomLogs({ limit: 3 }),

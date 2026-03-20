@@ -1,17 +1,21 @@
 import '../global.css';
 import React, { useEffect, useState } from 'react';
-import { View } from 'react-native';
+import { Platform, View } from 'react-native';
 import { Stack } from 'expo-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import * as SplashScreen from 'expo-splash-screen';
-import * as SecureStore from 'expo-secure-store';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { getDb } from '../src/db/client';
+import { isDbAvailable, getDb } from '../src/db/client';
 import { DisclaimerModal } from './modals/disclaimer';
 
-SplashScreen.preventAutoHideAsync();
+const isWeb = Platform.OS === 'web';
+
+// SplashScreen is native-only
+if (!isWeb) {
+  SplashScreen.preventAutoHideAsync();
+}
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -25,32 +29,51 @@ const queryClient = new QueryClient({
 const DISCLAIMER_KEY = 'disclaimer_acknowledged_v1';
 
 export default function RootLayout() {
-  const [dbReady, setDbReady] = useState(false);
+  const [ready, setReady] = useState(isWeb); // web skips init gate
   const [showDisclaimer, setShowDisclaimer] = useState(false);
 
   useEffect(() => {
     async function init() {
       try {
-        await getDb();
+        if (isDbAvailable()) {
+          await getDb();
+        }
 
-        const ack = await SecureStore.getItemAsync(DISCLAIMER_KEY);
+        // SecureStore is native-only; use localStorage on web
+        let ack: string | null;
+        if (isWeb) {
+          ack = typeof localStorage !== 'undefined'
+            ? localStorage.getItem(DISCLAIMER_KEY)
+            : 'true';
+        } else {
+          const SecureStore = await import('expo-secure-store');
+          ack = await SecureStore.getItemAsync(DISCLAIMER_KEY);
+        }
+
         if (!ack) {
           setShowDisclaimer(true);
         }
       } finally {
-        setDbReady(true);
-        await SplashScreen.hideAsync();
+        setReady(true);
+        if (!isWeb) {
+          await SplashScreen.hideAsync();
+        }
       }
     }
     void init();
   }, []);
 
   async function handleDisclaimerAck() {
-    await SecureStore.setItemAsync(DISCLAIMER_KEY, 'true');
+    if (isWeb) {
+      localStorage.setItem(DISCLAIMER_KEY, 'true');
+    } else {
+      const SecureStore = await import('expo-secure-store');
+      await SecureStore.setItemAsync(DISCLAIMER_KEY, 'true');
+    }
     setShowDisclaimer(false);
   }
 
-  if (!dbReady) return null;
+  if (!ready) return null;
 
   return (
     <GestureHandlerRootView className="flex-1">

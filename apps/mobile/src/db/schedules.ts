@@ -1,4 +1,4 @@
-import { getDb } from './client';
+import { getDb, isDbAvailable } from './client';
 import type { Schedule } from '@peptpal/core';
 
 export interface CreateScheduleInput {
@@ -12,6 +12,7 @@ export interface CreateScheduleInput {
 }
 
 export async function createSchedule(input: CreateScheduleInput): Promise<number> {
+  if (!isDbAvailable()) return 0;
   const db = await getDb();
   const result = await db.runAsync(
     `INSERT INTO schedules
@@ -31,6 +32,7 @@ export async function createSchedule(input: CreateScheduleInput): Promise<number
 }
 
 export async function getSchedules(): Promise<Schedule[]> {
+  if (!isDbAvailable()) return [];
   const db = await getDb();
   const rows = await db.getAllAsync<Schedule & { reminder_enabled: number }>(
     'SELECT * FROM schedules WHERE deleted_at IS NULL ORDER BY start_date ASC',
@@ -39,6 +41,7 @@ export async function getSchedules(): Promise<Schedule[]> {
 }
 
 export async function getScheduleById(id: number): Promise<Schedule | null> {
+  if (!isDbAvailable()) return null;
   const db = await getDb();
   const row = await db.getFirstAsync<Schedule & { reminder_enabled: number }>(
     'SELECT * FROM schedules WHERE id = ? AND deleted_at IS NULL',
@@ -48,10 +51,8 @@ export async function getScheduleById(id: number): Promise<Schedule | null> {
   return { ...row, reminder_enabled: Boolean(row.reminder_enabled) };
 }
 
-export async function updateScheduleReminder(
-  id: number,
-  reminder_enabled: boolean,
-): Promise<void> {
+export async function updateScheduleReminder(id: number, reminder_enabled: boolean): Promise<void> {
+  if (!isDbAvailable()) return;
   const db = await getDb();
   await db.runAsync('UPDATE schedules SET reminder_enabled = ? WHERE id = ?', [
     reminder_enabled ? 1 : 0,
@@ -60,6 +61,7 @@ export async function updateScheduleReminder(
 }
 
 export async function softDeleteSchedule(id: number): Promise<void> {
+  if (!isDbAvailable()) return;
   const db = await getDb();
   await db.runAsync(
     "UPDATE schedules SET deleted_at = datetime('now') WHERE id = ?",

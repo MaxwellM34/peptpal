@@ -1,4 +1,4 @@
-import { getDb } from './client';
+import { getDb, isDbAvailable } from './client';
 import type { InventoryItem } from '@peptpal/core';
 
 export interface CreateInventoryInput {
@@ -16,6 +16,7 @@ export interface CreateInventoryInput {
 }
 
 export async function createInventoryItem(input: CreateInventoryInput): Promise<number> {
+  if (!isDbAvailable()) return 0;
   const db = await getDb();
   const result = await db.runAsync(
     `INSERT INTO inventory
@@ -41,6 +42,7 @@ export async function createInventoryItem(input: CreateInventoryInput): Promise<
 }
 
 export async function getInventoryItems(): Promise<InventoryItem[]> {
+  if (!isDbAvailable()) return [];
   const db = await getDb();
   const rows = await db.getAllAsync<InventoryItem & { reconstituted: number }>(
     'SELECT * FROM inventory WHERE deleted_at IS NULL ORDER BY created_at DESC',
@@ -49,6 +51,7 @@ export async function getInventoryItems(): Promise<InventoryItem[]> {
 }
 
 export async function getInventoryItemById(id: number): Promise<InventoryItem | null> {
+  if (!isDbAvailable()) return null;
   const db = await getDb();
   const row = await db.getFirstAsync<InventoryItem & { reconstituted: number }>(
     'SELECT * FROM inventory WHERE id = ? AND deleted_at IS NULL',
@@ -62,10 +65,9 @@ export async function updateInventoryItem(
   id: number,
   updates: Partial<CreateInventoryInput>,
 ): Promise<void> {
+  if (!isDbAvailable()) return;
   const db = await getDb();
-  const fields = Object.keys(updates)
-    .map((k) => `${k} = ?`)
-    .join(', ');
+  const fields = Object.keys(updates).map((k) => `${k} = ?`).join(', ');
   const values = Object.values(updates).map((v) =>
     typeof v === 'boolean' ? (v ? 1 : 0) : (v ?? null),
   );
@@ -73,6 +75,7 @@ export async function updateInventoryItem(
 }
 
 export async function softDeleteInventoryItem(id: number): Promise<void> {
+  if (!isDbAvailable()) return;
   const db = await getDb();
   await db.runAsync(
     "UPDATE inventory SET deleted_at = datetime('now') WHERE id = ?",
@@ -80,8 +83,8 @@ export async function softDeleteInventoryItem(id: number): Promise<void> {
   );
 }
 
-/** Decrement vial count by 1 when an injection is logged */
 export async function decrementVialCount(id: number): Promise<void> {
+  if (!isDbAvailable()) return;
   const db = await getDb();
   await db.runAsync(
     'UPDATE inventory SET vial_count = MAX(0, vial_count - 1) WHERE id = ?',

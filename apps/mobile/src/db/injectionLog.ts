@@ -1,4 +1,4 @@
-import { getDb } from './client';
+import { getDb, isDbAvailable } from './client';
 import type { InjectionLog } from '@peptpal/core';
 
 export interface CreateInjectionLogInput {
@@ -13,6 +13,7 @@ export interface CreateInjectionLogInput {
 }
 
 export async function createInjectionLog(input: CreateInjectionLogInput): Promise<number> {
+  if (!isDbAvailable()) return 0;
   const db = await getDb();
   const result = await db.runAsync(
     `INSERT INTO peptides_log
@@ -38,6 +39,7 @@ export async function getInjectionLogs(opts?: {
   until?: string;
   limit?: number;
 }): Promise<InjectionLog[]> {
+  if (!isDbAvailable()) return [];
   const db = await getDb();
   const conditions: string[] = ['deleted_at IS NULL'];
   const params: (string | number)[] = [];
@@ -57,14 +59,14 @@ export async function getInjectionLogs(opts?: {
 
   const where = conditions.join(' AND ');
   const limit = opts?.limit ? `LIMIT ${opts.limit}` : '';
-  const rows = await db.getAllAsync<InjectionLog>(
+  return db.getAllAsync<InjectionLog>(
     `SELECT * FROM peptides_log WHERE ${where} ORDER BY injected_at DESC ${limit}`,
     params,
   );
-  return rows;
 }
 
 export async function getInjectionLogById(id: number): Promise<InjectionLog | null> {
+  if (!isDbAvailable()) return null;
   const db = await getDb();
   return db.getFirstAsync<InjectionLog>(
     'SELECT * FROM peptides_log WHERE id = ? AND deleted_at IS NULL',
@@ -73,6 +75,7 @@ export async function getInjectionLogById(id: number): Promise<InjectionLog | nu
 }
 
 export async function softDeleteInjectionLog(id: number): Promise<void> {
+  if (!isDbAvailable()) return;
   const db = await getDb();
   await db.runAsync(
     "UPDATE peptides_log SET deleted_at = datetime('now') WHERE id = ?",
