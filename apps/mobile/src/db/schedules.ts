@@ -34,7 +34,7 @@ export async function createSchedule(input: CreateScheduleInput): Promise<number
 export async function getSchedules(): Promise<Schedule[]> {
   if (!isDbAvailable()) return [];
   const db = await getDb();
-  const rows = await db.getAllAsync<Schedule & { reminder_enabled: number }>(
+  const rows = await db.getAllAsync<Omit<Schedule, 'reminder_enabled'> & { reminder_enabled: number }>(
     'SELECT * FROM schedules WHERE deleted_at IS NULL ORDER BY start_date ASC',
   );
   return rows.map((r) => ({ ...r, reminder_enabled: Boolean(r.reminder_enabled) }));
@@ -43,7 +43,7 @@ export async function getSchedules(): Promise<Schedule[]> {
 export async function getScheduleById(id: number): Promise<Schedule | null> {
   if (!isDbAvailable()) return null;
   const db = await getDb();
-  const row = await db.getFirstAsync<Schedule & { reminder_enabled: number }>(
+  const row = await db.getFirstAsync<Omit<Schedule, 'reminder_enabled'> & { reminder_enabled: number }>(
     'SELECT * FROM schedules WHERE id = ? AND deleted_at IS NULL',
     [id],
   );

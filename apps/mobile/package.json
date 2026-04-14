@@ -52,7 +52,6 @@
     "@babel/core": "^7.25.2",
     "@peptpal/config": "workspace:*",
     "@types/react": "~19.1.17",
-    "@types/react-native": "^0.73.0",
     "typescript": "^5.7.3"
   }
 }

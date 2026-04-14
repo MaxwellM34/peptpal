@@ -65,7 +65,7 @@ export default function DashboardScreen() {
 
         {/* Upcoming Schedules */}
         {schedules.length > 0 && (
-          <Section title="Today's Schedule" onSeeAll={() => router.push('/(tabs)/schedule/index')}>
+          <Section title="Today's Schedule" onSeeAll={() => router.push('/(tabs)/schedule')}>
             {schedules.slice(0, 3).map((s) => (
               <View key={s.id} className="bg-surface-card rounded-xl px-4 py-3 mb-2 flex-row items-center justify-between">
                 <View>
@@ -80,7 +80,7 @@ export default function DashboardScreen() {
 
         {/* Active Inventory */}
         {activeInventory.length > 0 && (
-          <Section title="Active Vials" onSeeAll={() => router.push('/(tabs)/inventory/index')}>
+          <Section title="Active Vials" onSeeAll={() => router.push('/(tabs)/inventory')}>
             {activeInventory.slice(0, 3).map((item) => (
               <View key={item.id} className="bg-surface-card rounded-xl px-4 py-3 mb-2 flex-row items-center justify-between">
                 <View>
@@ -100,7 +100,7 @@ export default function DashboardScreen() {
         )}
 
         {/* Recent Injections */}
-        <Section title="Recent Injections" onSeeAll={() => router.push('/(tabs)/log/index')}>
+        <Section title="Recent Injections" onSeeAll={() => router.push('/(tabs)/log')}>
           {recentLogs.length === 0 ? (
             <EmptyState message="No injections logged yet" />
           ) : (
@@ -122,7 +122,7 @@ export default function DashboardScreen() {
         </Section>
 
         {/* Recent Symptoms */}
-        <Section title="Recent Symptoms" onSeeAll={() => router.push('/(tabs)/symptoms/index')}>
+        <Section title="Recent Symptoms" onSeeAll={() => router.push('/(tabs)/symptoms')}>
           {recentSymptoms.length === 0 ? (
             <EmptyState message="No symptoms logged yet" />
           ) : (

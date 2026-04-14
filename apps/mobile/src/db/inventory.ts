@@ -44,7 +44,7 @@ export async function createInventoryItem(input: CreateInventoryInput): Promise<
 export async function getInventoryItems(): Promise<InventoryItem[]> {
   if (!isDbAvailable()) return [];
   const db = await getDb();
-  const rows = await db.getAllAsync<InventoryItem & { reconstituted: number }>(
+  const rows = await db.getAllAsync<Omit<InventoryItem, 'reconstituted'> & { reconstituted: number }>(
     'SELECT * FROM inventory WHERE deleted_at IS NULL ORDER BY created_at DESC',
   );
   return rows.map((r) => ({ ...r, reconstituted: Boolean(r.reconstituted) }));
@@ -53,7 +53,7 @@ export async function getInventoryItems(): Promise<InventoryItem[]> {
 export async function getInventoryItemById(id: number): Promise<InventoryItem | null> {
   if (!isDbAvailable()) return null;
   const db = await getDb();
-  const row = await db.getFirstAsync<InventoryItem & { reconstituted: number }>(
+  const row = await db.getFirstAsync<Omit<InventoryItem, 'reconstituted'> & { reconstituted: number }>(
     'SELECT * FROM inventory WHERE id = ? AND deleted_at IS NULL',
     [id],
   );

@@ -13,6 +13,9 @@ out/
 # Turbo
 .turbo/
 
+# TypeScript
+*.tsbuildinfo
+
 # Environment
 .env
 .env.local

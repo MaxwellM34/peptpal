@@ -55,7 +55,7 @@ export function detectSymptomPatterns(
 
   for (const [key, count] of patterns.entries()) {
     if (count >= PATTERN_MIN_OCCURRENCES) {
-      const [peptideId, symptom] = key.split('::');
+      const [peptideId, symptom = ''] = key.split('::');
       const peptideName =
         injections.find((i) => i.peptideId === peptideId)?.peptideName ?? peptideId ?? 'Unknown';
       results.push({

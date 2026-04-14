@@ -139,7 +139,7 @@ export default function PeptideDetailScreen() {
           {/* Suggest correction */}
           <TouchableOpacity
             className="border border-surface-border rounded-xl py-3 items-center mb-6 active:bg-surface-elevated"
-            onPress={() => router.push({ pathname: '/(tabs)/settings/index', params: { suggest: peptide.id } })}
+            onPress={() => router.push({ pathname: '/(tabs)/settings', params: { suggest: peptide.id } })}
           >
             <Text className="text-slate-400 text-sm">Suggest a correction or addition</Text>
           </TouchableOpacity>

@@ -28,6 +28,12 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
   if (moduleName === 'react') {
     return { filePath: path.join(reactRoot, 'index.js'), type: 'sourceFile' };
   }
+  if (moduleName === 'react/jsx-runtime') {
+    return { filePath: path.join(reactRoot, 'jsx-runtime.js'), type: 'sourceFile' };
+  }
+  if (moduleName === 'react/jsx-dev-runtime') {
+    return { filePath: path.join(reactRoot, 'jsx-dev-runtime.js'), type: 'sourceFile' };
+  }
   // expo-sqlite uses WebAssembly on web which Metro can't bundle — shim it
   if (platform === 'web' && moduleName === 'expo-sqlite') {
     return { filePath: emptyModule, type: 'sourceFile' };
