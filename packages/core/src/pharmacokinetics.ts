@@ -30,7 +30,49 @@ export interface PkPoint {
 export interface PkSeries {
   peptideName: string;
   color: string;
+  halfLifeHours: number;
   points: PkPoint[];
+}
+
+export interface PkSeriesStats {
+  peptideName: string;
+  color: string;
+  halfLifeHours: number;
+  peakMcg: number;
+  peakAt: number;
+  currentMcg: number;
+  lastInjectedAt: number | null;
+  halfLivesSinceLastDose: number | null;
+}
+
+export function computeSeriesStats(series: PkSeries, injections: PkInjection[], now: number): PkSeriesStats {
+  const mine = injections.filter((i) => i.peptideName === series.peptideName);
+  const peak = series.points.reduce(
+    (best, p) => (p.mcg > best.mcg ? p : best),
+    series.points[0] ?? { t: now, mcg: 0 },
+  );
+  const current = series.points.reduce(
+    (best, p) => (Math.abs(p.t - now) < Math.abs(best.t - now) ? p : best),
+    series.points[0] ?? { t: now, mcg: 0 },
+  );
+  const lastInjectedAt = mine.length
+    ? Math.max(...mine.map((i) => i.injectedAt))
+    : null;
+  const halfLivesSinceLastDose =
+    lastInjectedAt != null
+      ? (now - lastInjectedAt) / 3_600_000 / series.halfLifeHours
+      : null;
+
+  return {
+    peptideName: series.peptideName,
+    color: series.color,
+    halfLifeHours: series.halfLifeHours,
+    peakMcg: peak.mcg,
+    peakAt: peak.t,
+    currentMcg: current.mcg,
+    lastInjectedAt,
+    halfLivesSinceLastDose,
+  };
 }
 
 const SERIES_COLORS = [
@@ -120,6 +162,7 @@ export function computePkSeries(
     series.push({
       peptideName: name,
       color: SERIES_COLORS[idx % SERIES_COLORS.length]!,
+      halfLifeHours: injs[0]!.halfLifeHours,
       points,
     });
   });

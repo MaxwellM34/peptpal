@@ -3,7 +3,12 @@ import { View, Text, ScrollView, TouchableOpacity, useWindowDimensions } from 'r
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import { LineChart } from '@peptpal/ui';
-import { computePkSeries, expandBlendLogs, type PkSeries } from '@peptpal/core';
+import {
+  computePkSeries,
+  computeSeriesStats,
+  expandBlendLogs,
+  type PkSeriesStats,
+} from '@peptpal/core';
 import { getInjectionLogs } from '../../../src/db/injectionLog';
 import { usePeptideList } from '../../../src/hooks/usePeptides';
 import type { InjectionLog } from '@peptpal/core';
@@ -20,6 +25,7 @@ export default function PkChartScreen() {
   const { width } = useWindowDimensions();
   const [logs, setLogs] = useState<InjectionLog[]>([]);
   const [range, setRange] = useState<RangeKey>('7d');
+  const [normalize, setNormalize] = useState(false);
   const [hidden, setHidden] = useState<Set<string>>(new Set());
   const peptideListQuery = usePeptideList();
 
@@ -40,13 +46,14 @@ export default function PkChartScreen() {
     return map;
   }, [peptideListQuery.data]);
 
-  const { series, startMs, endMs, nowMs } = useMemo(() => {
+  const { series, startMs, endMs, nowMs, stats } = useMemo(() => {
     const now = Date.now();
     const start = now - RANGE_HOURS[range] * 3_600_000;
     const end = now + 6 * 3_600_000;
     const injections = expandBlendLogs(logs, halfLives);
     const all = computePkSeries(injections, start, end, 120);
-    return { series: all, startMs: start, endMs: end, nowMs: now };
+    const s = all.map((ser) => computeSeriesStats(ser, injections, now));
+    return { series: all, startMs: start, endMs: end, nowMs: now, stats: s };
   }, [logs, halfLives, range]);
 
   const visibleSeries = useMemo(
@@ -74,7 +81,7 @@ export default function PkChartScreen() {
           Estimated from your injection log and published half-lives. Exponential decay model.
         </Text>
 
-        <View className="flex-row gap-2 mb-4">
+        <View className="flex-row gap-2 mb-2">
           {(Object.keys(RANGE_HOURS) as RangeKey[]).map((k) => (
             <TouchableOpacity
               key={k}
@@ -90,7 +97,25 @@ export default function PkChartScreen() {
               </Text>
             </TouchableOpacity>
           ))}
+          <View className="flex-1" />
+          <TouchableOpacity
+            onPress={() => setNormalize((v) => !v)}
+            className={`px-3 py-2 rounded-full border ${
+              normalize
+                ? 'bg-primary-600 border-primary-500'
+                : 'bg-surface-card border-surface-border'
+            }`}
+          >
+            <Text className={`text-xs font-semibold ${normalize ? 'text-white' : 'text-slate-300'}`}>
+              {normalize ? '% peak' : 'mcg'}
+            </Text>
+          </TouchableOpacity>
         </View>
+        <Text className="text-slate-500 text-[10px] mb-4">
+          {normalize
+            ? 'Each curve scaled to its own peak — compare shapes across peptides with very different doses.'
+            : 'Absolute concentrations in mcg.'}
+        </Text>
 
         {!hasData ? (
           <View className="bg-surface-card rounded-2xl py-12 items-center">
@@ -108,6 +133,8 @@ export default function PkChartScreen() {
                 startMs={startMs}
                 endMs={endMs}
                 nowMs={nowMs}
+                normalize={normalize}
+                showPeaks
               />
               <View className="flex-row flex-wrap gap-2 mt-3">
                 {series.map((s) => {
@@ -131,10 +158,7 @@ export default function PkChartScreen() {
                           backgroundColor: on ? s.color : '#475569',
                         }}
                       />
-                      <Text
-                        className="text-xs"
-                        style={{ color: on ? '#e2e8f0' : '#64748b' }}
-                      >
+                      <Text className="text-xs" style={{ color: on ? '#e2e8f0' : '#64748b' }}>
                         {s.peptideName}
                       </Text>
                     </TouchableOpacity>
@@ -143,34 +167,40 @@ export default function PkChartScreen() {
               </View>
             </View>
 
-            {series.map((s) => (
-              <View key={s.peptideName} className="bg-surface-card rounded-2xl p-3 mb-3">
-                <View className="flex-row items-center justify-between mb-2">
-                  <View className="flex-row items-center gap-2">
-                    <View
-                      style={{
-                        width: 10,
-                        height: 10,
-                        borderRadius: 5,
-                        backgroundColor: s.color,
-                      }}
-                    />
-                    <Text className="text-white text-sm font-semibold">{s.peptideName}</Text>
+            {series.map((s) => {
+              const stat = stats.find((st) => st.peptideName === s.peptideName);
+              return (
+                <View key={s.peptideName} className="bg-surface-card rounded-2xl p-3 mb-3">
+                  <View className="flex-row items-center justify-between mb-2">
+                    <View className="flex-row items-center gap-2 flex-1">
+                      <View
+                        style={{
+                          width: 10,
+                          height: 10,
+                          borderRadius: 5,
+                          backgroundColor: s.color,
+                        }}
+                      />
+                      <Text className="text-white text-sm font-semibold">{s.peptideName}</Text>
+                    </View>
+                    <Text className="text-slate-500 text-[10px]">
+                      t½ {formatHours(s.halfLifeHours)}
+                    </Text>
                   </View>
-                  <Text className="text-slate-400 text-xs">
-                    now: {formatNow(s)} mcg
-                  </Text>
+                  {stat ? <MetricsRow stat={stat} /> : null}
+                  <LineChart
+                    series={[s]}
+                    width={chartWidth - 24}
+                    height={140}
+                    startMs={startMs}
+                    endMs={endMs}
+                    nowMs={nowMs}
+                    normalize={false}
+                    showPeaks
+                  />
                 </View>
-                <LineChart
-                  series={[s]}
-                  width={chartWidth - 24}
-                  height={140}
-                  startMs={startMs}
-                  endMs={endMs}
-                  nowMs={nowMs}
-                />
-              </View>
-            ))}
+              );
+            })}
           </>
         )}
         <View className="h-6" />
@@ -179,10 +209,56 @@ export default function PkChartScreen() {
   );
 }
 
-function formatNow(s: PkSeries): string {
-  const now = Date.now();
-  const nearest = s.points.reduce((best, p) =>
-    Math.abs(p.t - now) < Math.abs(best.t - now) ? p : best,
+function MetricsRow({ stat }: { stat: PkSeriesStats }) {
+  return (
+    <View className="flex-row justify-between bg-surface-elevated rounded-lg px-3 py-2 mb-2">
+      <Metric label="now" value={formatMcg(stat.currentMcg)} />
+      <Metric label="peak" value={formatMcg(stat.peakMcg)} />
+      <Metric
+        label="since dose"
+        value={
+          stat.lastInjectedAt == null
+            ? '—'
+            : formatDuration(Date.now() - stat.lastInjectedAt)
+        }
+      />
+      <Metric
+        label="half-lives"
+        value={
+          stat.halfLivesSinceLastDose == null ? '—' : stat.halfLivesSinceLastDose.toFixed(1)
+        }
+      />
+    </View>
   );
-  return nearest.mcg >= 10 ? nearest.mcg.toFixed(0) : nearest.mcg.toFixed(2);
+}
+
+function Metric({ label, value }: { label: string; value: string }) {
+  return (
+    <View className="items-center">
+      <Text className="text-white font-semibold text-sm">{value}</Text>
+      <Text className="text-slate-500 text-[10px] uppercase tracking-wider">{label}</Text>
+    </View>
+  );
+}
+
+function formatMcg(v: number): string {
+  if (v >= 1000) return `${(v / 1000).toFixed(1)}k mcg`;
+  if (v >= 100) return `${v.toFixed(0)} mcg`;
+  if (v >= 10) return `${v.toFixed(0)} mcg`;
+  if (v >= 1) return `${v.toFixed(1)} mcg`;
+  if (v > 0) return `${v.toFixed(2)} mcg`;
+  return '0 mcg';
+}
+
+function formatHours(h: number): string {
+  if (h < 1) return `${(h * 60).toFixed(0)}m`;
+  if (h < 48) return `${h.toFixed(h < 10 ? 1 : 0)}h`;
+  return `${(h / 24).toFixed(1)}d`;
+}
+
+function formatDuration(ms: number): string {
+  const h = ms / 3_600_000;
+  if (h < 1) return `${Math.round(h * 60)}m`;
+  if (h < 48) return `${h.toFixed(1)}h`;
+  return `${(h / 24).toFixed(1)}d`;
 }
