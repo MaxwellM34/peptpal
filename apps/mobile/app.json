@@ -36,7 +36,7 @@
     },
     "web": {
       "bundler": "metro",
-      "output": "static",
+      "output": "single",
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
@@ -61,6 +61,13 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "fd07077b-fd87-49c0-a3d2-c34088dfd01a"
+      }
+    },
+    "owner": "maxwellm34"
   }
 }

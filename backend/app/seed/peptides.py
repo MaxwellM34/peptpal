@@ -445,4 +445,33 @@ PEPTIDES = [
         "side_effects": ["nausea", "flushing", "facial flushing", "headache", "hypertension (transient)", "hyperpigmentation (long term)", "vomiting"],
         "synergies": [],
     },
+    {
+        "slug": "glow",
+        "name": "Glow (GHK-Cu / TB-500 / BPC-157)",
+        "aliases": ["Glow Blend", "GHK-Cu:TB-500:BPC-157 50:10:10"],
+        "description": (
+            "Glow is a pre-mixed blend of GHK-Cu, TB-500, and BPC-157 in a 50:10:10 mcg ratio. "
+            "It combines three peptides with overlapping regenerative, skin, and tissue repair "
+            "actions into a single injection. Because each component has a different half-life, "
+            "concentrations decay on independent curves after a single dose."
+        ),
+        "disclaimer": (
+            "This information is for harm reduction purposes only. It is not medical advice. "
+            "Glow is a research-chem blend; none of the components are FDA-approved for this use. "
+            "Consult a qualified healthcare professional before use."
+        ),
+        "half_life_hours": 4.0,
+        "recommended_dose_mcg_min": 70.0,
+        "recommended_dose_mcg_max": 140.0,
+        "max_dose_mcg": 280.0,
+        "frequency_notes": "Typically 70 mcg (50 GHK-Cu / 10 TB-500 / 10 BPC-157) subQ daily or every other day, in cycles of 4–8 weeks.",
+        "storage_temp": "fridge",
+        "routes": ["subq", "im"],
+        "common_protocols": [
+            {"name": "Standard cycle", "description": "70 mcg subQ daily for 4–8 weeks (yields 50 mcg GHK-Cu + 10 mcg TB-500 + 10 mcg BPC-157 per dose)."},
+            {"name": "Every other day", "description": "140 mcg subQ EOD for 8 weeks, for slower tapered exposure of each component."},
+        ],
+        "side_effects": ["injection site redness", "skin darkening (copper-related)", "nausea", "fatigue", "mild headache"],
+        "synergies": ["BPC-157", "TB-500", "GHK-Cu"],
+    },
 ]

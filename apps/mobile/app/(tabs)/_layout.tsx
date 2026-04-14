@@ -84,6 +84,7 @@ export default function TabsLayout() {
       {/* Hidden screens (navigated to programmatically) */}
       <Tabs.Screen name="library/[slug]" options={{ href: null }} />
       <Tabs.Screen name="log/new" options={{ href: null }} />
+      <Tabs.Screen name="log/chart" options={{ href: null }} />
       <Tabs.Screen name="symptoms/new" options={{ href: null }} />
       <Tabs.Screen name="inventory/[id]" options={{ href: null }} />
       <Tabs.Screen name="schedule/new" options={{ href: null }} />

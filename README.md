@@ -52,6 +52,49 @@ pnpm --filter @peptpal/mobile dev
 
 ---
 
+## Testing on your iPhone (one command)
+
+From a Linux/WSL dev machine with Docker, cloudflared, and Expo Go installed:
+
+```bash
+pnpm iphone
+```
+
+This single command:
+1. Boots postgres + api via `docker compose`
+2. Opens a public HTTPS tunnel for the API (port 8000) via cloudflared
+3. Opens a public HTTPS tunnel for Metro (port 8081) via cloudflared
+4. Writes the API URL into `apps/mobile/.env.local`
+5. Starts Expo with `EXPO_PACKAGER_PROXY_URL` set to the Metro tunnel so the QR resolves from anywhere
+
+**Usage**
+
+1. Install **Expo Go** on your iPhone.
+2. Run `pnpm iphone`.
+3. Wait for the QR to appear (both tunnels must print their URLs first — takes ~10s).
+4. Open Expo Go → tap "Scan QR code" → point at the QR in your terminal.
+5. App loads over the tunnel. Works on cellular or any Wi-Fi.
+6. `Ctrl+C` stops Metro and tears down both tunnels automatically.
+
+**Prereqs** (one-time):
+
+```bash
+# cloudflared (free, no account)
+curl -fsSL https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 \
+  -o ~/.local/bin/cloudflared && chmod +x ~/.local/bin/cloudflared
+
+# Expo Go from the App Store on your iPhone
+```
+
+**Troubleshooting**
+
+- Tunnel URLs change every run — that's fine, the script writes the current API URL into `.env.local` each time.
+- If the API tunnel doesn't come up in 30s, check `docker compose logs api`.
+- Tunnel logs are kept at `.dev-iphone/*.log` for the current run.
+- Scan the QR with **Expo Go's own scanner** — the iOS Camera app won't open `exp://` URLs.
+
+---
+
 ## Monorepo Structure
 
 ```

@@ -9,3 +9,5 @@ export { DoseWarningModal } from './DoseWarningModal';
 export { InjectionSiteSelector } from './InjectionSiteSelector';
 export { TimelineRow } from './TimelineRow';
 export { DisclaimerBanner } from './DisclaimerBanner';
+export { LineChart } from './LineChart';
+export type { LineChartProps } from './LineChart';

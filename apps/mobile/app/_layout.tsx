@@ -40,14 +40,20 @@ export default function RootLayout() {
         }
 
         // SecureStore is native-only; use localStorage on web
-        let ack: string | null;
+        let ack: string | null = null;
         if (isWeb) {
           ack = typeof localStorage !== 'undefined'
             ? localStorage.getItem(DISCLAIMER_KEY)
             : 'true';
         } else {
-          const SecureStore = await import('expo-secure-store');
-          ack = await SecureStore.getItemAsync(DISCLAIMER_KEY);
+          try {
+            const SecureStore = await import('expo-secure-store');
+            ack = await SecureStore.getItemAsync(DISCLAIMER_KEY);
+          } catch {
+            // Keychain can fail if device locked / Expo Go startup race.
+            // Treat as unseen so user re-acks rather than crashing boot.
+            ack = null;
+          }
         }
 
         if (!ack) {
@@ -67,8 +73,12 @@ export default function RootLayout() {
     if (isWeb) {
       localStorage.setItem(DISCLAIMER_KEY, 'true');
     } else {
-      const SecureStore = await import('expo-secure-store');
-      await SecureStore.setItemAsync(DISCLAIMER_KEY, 'true');
+      try {
+        const SecureStore = await import('expo-secure-store');
+        await SecureStore.setItemAsync(DISCLAIMER_KEY, 'true');
+      } catch {
+        // Non-fatal — user acknowledged in-session.
+      }
     }
     setShowDisclaimer(false);
   }

@@ -12,9 +12,9 @@
     "lint": "eslint src --ext .ts,.tsx"
   },
   "peerDependencies": {
-    "react": "*",
-    "react-native": "*",
-    "nativewind": "*"
+    "react": "19.1.0",
+    "react-native": "0.81.5",
+    "nativewind": "^4.1.23"
   },
   "devDependencies": {
     "@peptpal/config": "workspace:*",
