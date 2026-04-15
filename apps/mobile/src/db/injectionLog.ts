@@ -74,6 +74,39 @@ export async function getInjectionLogById(id: number): Promise<InjectionLog | nu
   );
 }
 
+export interface SiteLastUsed {
+  site: string;
+  lastInjectedAt: string;
+  peptideName: string;
+  daysSince: number;
+  /** 'ok' = ready (>7d), 'warning' = resting (4–7d), 'avoid' = too soon (<4d) */
+  status: 'ok' | 'warning' | 'avoid';
+}
+
+export async function getSiteRotationStatus(): Promise<SiteLastUsed[]> {
+  if (!isDbAvailable()) return [];
+  const db = await getDb();
+  const rows = await db.getAllAsync<{ site: string; last_injected_at: string; peptide_name: string }>(
+    `SELECT injection_site as site,
+            MAX(injected_at) as last_injected_at,
+            peptide_name
+     FROM peptides_log
+     WHERE deleted_at IS NULL AND injection_site IS NOT NULL
+     GROUP BY injection_site`,
+  );
+  const now = Date.now();
+  return rows.map((r) => {
+    const daysSince = (now - new Date(r.last_injected_at).getTime()) / 86_400_000;
+    return {
+      site: r.site,
+      lastInjectedAt: r.last_injected_at,
+      peptideName: r.peptide_name,
+      daysSince,
+      status: daysSince >= 7 ? 'ok' : daysSince >= 4 ? 'warning' : 'avoid',
+    };
+  });
+}
+
 export async function softDeleteInjectionLog(id: number): Promise<void> {
   if (!isDbAvailable()) return;
   const db = await getDb();

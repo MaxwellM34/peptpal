@@ -11,3 +11,7 @@ export { TimelineRow } from './TimelineRow';
 export { DisclaimerBanner } from './DisclaimerBanner';
 export { LineChart } from './LineChart';
 export type { LineChartProps } from './LineChart';
+export { BodyMap, SiteRotationCard } from './BodyMap';
+export type { SiteStatus, SiteInfo } from './BodyMap';
+export { SyringeDiagram } from './SyringeDiagram';
+export type { SyringeDiagramProps } from './SyringeDiagram';

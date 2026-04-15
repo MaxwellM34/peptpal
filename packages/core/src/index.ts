@@ -3,4 +3,7 @@ export * from './doseSafety';
 export * from './inventory';
 export * from './patternDetection';
 export * from './pharmacokinetics';
+export * from './cycleMetadata';
+export * from './goalProtocols';
+export * from './blendCompat';
 export * from './types';

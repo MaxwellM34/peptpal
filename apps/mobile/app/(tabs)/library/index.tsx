@@ -30,6 +30,22 @@ export default function LibraryScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-surface" edges={['bottom']}>
+      {/* Quick links */}
+      <View className="flex-row gap-2 px-4 pt-3">
+        <TouchableOpacity
+          className="flex-1 bg-surface-card border border-surface-border rounded-xl py-2 items-center active:bg-surface-elevated"
+          onPress={() => router.push('/(tabs)/library/goals')}
+        >
+          <Text className="text-slate-200 text-xs font-semibold">🎯 By Goal</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          className="flex-1 bg-surface-card border border-surface-border rounded-xl py-2 items-center active:bg-surface-elevated"
+          onPress={() => router.push('/(tabs)/library/blends')}
+        >
+          <Text className="text-slate-200 text-xs font-semibold">🧪 Blend Compat</Text>
+        </TouchableOpacity>
+      </View>
+
       {/* Search bar */}
       <View className="px-4 pt-3 pb-2">
         <TextInput

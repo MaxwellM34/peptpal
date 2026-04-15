@@ -38,10 +38,16 @@ export default function LogHistoryScreen() {
               <Text className="text-white font-bold">+ Log Injection</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              className="bg-surface-card border border-surface-border rounded-xl py-3 px-4 items-center active:bg-surface-elevated"
+              className="bg-surface-card border border-surface-border rounded-xl py-3 px-3 items-center active:bg-surface-elevated"
               onPress={() => router.push('/(tabs)/log/chart')}
             >
               <Text className="text-slate-200 font-semibold">📈 Levels</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              className="bg-surface-card border border-surface-border rounded-xl py-3 px-3 items-center active:bg-surface-elevated"
+              onPress={() => router.push('/(tabs)/log/sites')}
+            >
+              <Text className="text-slate-200 font-semibold">🎯 Sites</Text>
             </TouchableOpacity>
           </View>
         }

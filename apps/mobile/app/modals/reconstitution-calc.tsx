@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { TextInput, Button, Card, DisclaimerBanner } from '@peptpal/ui';
+import { TextInput, Button, Card, DisclaimerBanner, SyringeDiagram } from '@peptpal/ui';
 import { reconstitutionCalc, reconstitutionCalcByDose } from '@peptpal/core';
 
 type Mode = 'by_concentration' | 'by_dose';
@@ -119,6 +119,12 @@ export default function ReconstitutionCalcModal() {
                 )}
                 <ResultRow label="Volume per Dose" value={`${result.mlPerDose} mL`} />
                 <ResultRow label="Doses per Vial" value={`${result.dosesPerVial}`} />
+
+                <View className="border-t border-surface-border pt-3 mt-1">
+                  <Text className="text-slate-400 text-xs mb-2 font-semibold">U-100 Insulin Syringe</Text>
+                  <SyringeDiagram volumeMl={result.mlPerDose} capacityMl={result.mlPerDose > 1 ? 3 : 1} />
+                </View>
+
                 {result.lowVolumeWarning && (
                   <View className="bg-warning-900/30 border border-warning-700/50 rounded-xl p-3 mt-1">
                     <Text className="text-warning-400 text-xs leading-relaxed">

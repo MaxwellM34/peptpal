@@ -8,23 +8,44 @@ import { estimateRemainingDoses } from '@peptpal/core';
 import { getInventoryItems, softDeleteInventoryItem } from '../../../src/db/inventory';
 import type { InventoryItem } from '@peptpal/core';
 
-type InventoryStatus = 'Sealed' | 'Reconstituted' | 'Low' | 'Expired';
+type InventoryStatus = 'Sealed' | 'Fresh' | 'Stable' | 'Aging' | 'Low' | 'Degraded' | 'Expired';
 
-function getStatus(item: InventoryItem): InventoryStatus {
-  if (item.expiry_at && new Date(item.expiry_at) < new Date()) return 'Expired';
-  if (!item.reconstituted) return 'Sealed';
-  if (item.concentration_mcg_per_ml && item.vial_count > 0) {
-    // Assume each vial is ~2mL after reconstitution for estimation
-    const remaining = estimateRemainingDoses(item.concentration_mcg_per_ml, 2 * item.vial_count, 250);
-    if (remaining < 3) return 'Low';
+/** Reconstituted peptide stability in fridge (days). Community consensus: 28 days. */
+const RECON_STABILITY_DAYS = 28;
+
+function daysSince(iso: string | null | undefined): number | null {
+  if (!iso) return null;
+  return (Date.now() - new Date(iso).getTime()) / 86_400_000;
+}
+
+function getStatus(item: InventoryItem): { status: InventoryStatus; daysRecon: number | null } {
+  const daysRecon = daysSince(item.opened_at);
+  if (item.expiry_at && new Date(item.expiry_at) < new Date()) {
+    return { status: 'Expired', daysRecon };
   }
-  return 'Reconstituted';
+  if (!item.reconstituted) return { status: 'Sealed', daysRecon };
+
+  if (daysRecon != null) {
+    if (daysRecon >= RECON_STABILITY_DAYS) return { status: 'Degraded', daysRecon };
+    if (daysRecon >= RECON_STABILITY_DAYS * 0.75) return { status: 'Aging', daysRecon };
+  }
+
+  if (item.concentration_mcg_per_ml && item.vial_count > 0) {
+    const remaining = estimateRemainingDoses(item.concentration_mcg_per_ml, 2 * item.vial_count, 250);
+    if (remaining < 3) return { status: 'Low', daysRecon };
+  }
+
+  if (daysRecon != null && daysRecon < 7) return { status: 'Fresh', daysRecon };
+  return { status: 'Stable', daysRecon };
 }
 
 const statusBadgeVariant: Record<InventoryStatus, 'default' | 'success' | 'warning' | 'danger' | 'info'> = {
   Sealed: 'info',
-  Reconstituted: 'success',
+  Fresh: 'success',
+  Stable: 'success',
+  Aging: 'warning',
   Low: 'warning',
+  Degraded: 'danger',
   Expired: 'danger',
 };
 
@@ -54,7 +75,8 @@ export default function InventoryScreen() {
           </TouchableOpacity>
         }
         renderItem={({ item }) => {
-          const status = getStatus(item);
+          const { status, daysRecon } = getStatus(item);
+          const daysLeft = daysRecon != null ? Math.max(0, Math.ceil(RECON_STABILITY_DAYS - daysRecon)) : null;
           return (
             <TouchableOpacity
               className="bg-surface-card rounded-2xl mb-3 p-4 active:bg-surface-elevated"
@@ -70,6 +92,33 @@ export default function InventoryScreen() {
                 </View>
                 <Badge variant={statusBadgeVariant[status]}>{status}</Badge>
               </View>
+
+              {item.reconstituted && daysLeft != null && status !== 'Expired' && (
+                <View className="mt-3">
+                  <View className="flex-row justify-between mb-1">
+                    <Text className="text-slate-500 text-[10px] uppercase font-semibold">
+                      Reconstituted Stability
+                    </Text>
+                    <Text className={`text-[10px] font-bold ${
+                      status === 'Degraded' ? 'text-red-400' :
+                      status === 'Aging' ? 'text-amber-400' : 'text-emerald-400'
+                    }`}>
+                      {status === 'Degraded' ? 'Past stability' : `${daysLeft}d left`}
+                    </Text>
+                  </View>
+                  <View className="h-1 bg-surface-elevated rounded-full overflow-hidden">
+                    <View
+                      className={`h-1 rounded-full ${
+                        status === 'Degraded' ? 'bg-red-500' :
+                        status === 'Aging' ? 'bg-amber-500' : 'bg-emerald-500'
+                      }`}
+                      style={{
+                        width: `${Math.min(100, ((daysRecon ?? 0) / RECON_STABILITY_DAYS) * 100)}%`,
+                      }}
+                    />
+                  </View>
+                </View>
+              )}
 
               <View className="mt-3 flex-row flex-wrap gap-3">
                 {item.concentration_mcg_per_ml != null && (

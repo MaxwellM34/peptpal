@@ -35,12 +35,20 @@ export default function ScheduleScreen() {
         keyExtractor={(s) => String(s.id)}
         contentContainerStyle={{ padding: 16 }}
         ListHeaderComponent={
-          <TouchableOpacity
-            className="bg-primary-600 rounded-xl py-3 items-center mb-4 active:bg-primary-700"
-            onPress={() => router.push('/(tabs)/schedule/new')}
-          >
-            <Text className="text-white font-bold">+ New Schedule</Text>
-          </TouchableOpacity>
+          <View className="flex-row gap-2 mb-4">
+            <TouchableOpacity
+              className="flex-1 bg-primary-600 rounded-xl py-3 items-center active:bg-primary-700"
+              onPress={() => router.push('/(tabs)/schedule/new')}
+            >
+              <Text className="text-white font-bold">+ New Schedule</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              className="bg-surface-card border border-surface-border rounded-xl py-3 px-4 items-center active:bg-surface-elevated"
+              onPress={() => router.push('/(tabs)/schedule/cycles')}
+            >
+              <Text className="text-slate-200 font-semibold">🔁 Cycles</Text>
+            </TouchableOpacity>
+          </View>
         }
         renderItem={({ item: s }) => {
           const startDate = new Date(s.start_date);
