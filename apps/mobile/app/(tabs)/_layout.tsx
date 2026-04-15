@@ -31,6 +31,7 @@ export default function TabsLayout() {
       <Tabs.Screen name="symptoms/new" options={{ href: null }} />
       <Tabs.Screen name="inventory/[id]" options={{ href: null }} />
       <Tabs.Screen name="inventory/receive" options={{ href: null }} />
+      <Tabs.Screen name="inventory/batch/[id]" options={{ href: null }} />
       <Tabs.Screen name="schedule/new" options={{ href: null }} />
       <Tabs.Screen name="schedule/cycles" options={{ href: null }} />
       <Tabs.Screen name="schedule/protocols" options={{ href: null }} />

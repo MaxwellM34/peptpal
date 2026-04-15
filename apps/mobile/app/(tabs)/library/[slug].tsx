@@ -1,14 +1,27 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
-import { Badge, Card, DisclaimerBanner } from '@peptpal/ui';
+import { Badge, Card, DisclaimerBanner, DoseScalingCard } from '@peptpal/ui';
+import {
+  getProtocolSeed,
+  getCycleMetadata,
+  getDegradationProfile,
+  scaleDose,
+  topTier,
+} from '@peptpal/core';
 import { usePeptideDetail } from '../../../src/hooks/usePeptides';
+import { getUserProfile } from '../../../src/db/profile';
 
 export default function PeptideDetailScreen() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
   const router = useRouter();
   const { data: peptide, isLoading, isError } = usePeptideDetail(slug ?? '');
+  const [weightKg, setWeightKg] = useState<number | null>(null);
+
+  useEffect(() => {
+    void getUserProfile().then((p) => setWeightKg(p?.weight_kg ?? null));
+  }, []);
 
   if (isLoading) {
     return (
@@ -36,6 +49,24 @@ export default function PeptideDetailScreen() {
       <SafeAreaView className="flex-1 bg-surface" edges={['bottom']}>
         <ScrollView className="flex-1 px-4 pt-4">
           <DisclaimerBanner />
+
+          {/* Weight-scaled dose (if seed + profile weight present) */}
+          <PeptideScaledDoseCard slug={peptide.slug} peptideName={peptide.name} weightKg={weightKg} />
+
+          {/* Cycle + degradation summary */}
+          <PeptideCycleDegradationCard slug={peptide.slug} />
+
+          {/* Community link */}
+          <TouchableOpacity
+            className="bg-surface-card border border-surface-border rounded-xl py-3 px-4 mb-4 flex-row items-center justify-between active:bg-surface-elevated"
+            onPress={() => router.push(`/(tabs)/community/${peptide.slug}`)}
+          >
+            <View className="flex-row items-center gap-2">
+              <Text style={{ fontSize: 18 }}>💬</Text>
+              <Text className="text-slate-200 font-semibold text-sm">Open community consensus</Text>
+            </View>
+            <Text className="text-slate-500 text-xl">›</Text>
+          </TouchableOpacity>
 
           {/* Header */}
           <View className="mb-4">
@@ -162,5 +193,67 @@ function InfoRow({ label, value, highlight }: { label: string; value: string; hi
         {value}
       </Text>
     </View>
+  );
+}
+
+function PeptideScaledDoseCard({
+  slug,
+  peptideName,
+  weightKg,
+}: {
+  slug: string;
+  peptideName: string;
+  weightKg: number | null;
+}) {
+  const seed = getProtocolSeed(slug);
+  if (!seed || weightKg == null) return null;
+  const scaled = scaleDose(seed.startingDose, { weightKg });
+  return (
+    <View className="mb-4">
+      <DoseScalingCard
+        peptideName={peptideName}
+        recommendation={seed.startingDose}
+        scaled={scaled}
+        topSourceTier={topTier(seed.sources)}
+        sourceCount={seed.sources.length}
+      />
+    </View>
+  );
+}
+
+function PeptideCycleDegradationCard({ slug }: { slug: string }) {
+  const meta = getCycleMetadata(slug);
+  const degr = getDegradationProfile(slug);
+  return (
+    <Card className="mb-4">
+      <Text className="text-white font-bold text-sm mb-2">Cycle + degradation</Text>
+      {meta.requiresCycling && (
+        <View className="mb-2">
+          <Text className="text-amber-300 text-xs font-semibold">Requires cycling</Text>
+          <Text className="text-slate-300 text-xs leading-5 mt-0.5">
+            {meta.cycleNote}
+          </Text>
+        </View>
+      )}
+      <View className="flex-row gap-3 mt-1">
+        <View className="flex-1">
+          <Text className="text-slate-500 text-[10px] uppercase font-semibold">Max weeks on</Text>
+          <Text className="text-white font-bold">{meta.maxWeeksOn ?? '—'}</Text>
+        </View>
+        <View className="flex-1">
+          <Text className="text-slate-500 text-[10px] uppercase font-semibold">Off weeks</Text>
+          <Text className="text-white font-bold">{meta.recommendedOffWeeks ?? '—'}</Text>
+        </View>
+        <View className="flex-1">
+          <Text className="text-slate-500 text-[10px] uppercase font-semibold">Recon fridge rate</Text>
+          <Text className="text-white font-bold">
+            {(degr.k_reconstituted_fridge * 100).toFixed(1)}% /day
+          </Text>
+        </View>
+      </View>
+      <Text className="text-slate-500 text-[10px] italic mt-2">
+        {degr.source}
+      </Text>
+    </Card>
   );
 }

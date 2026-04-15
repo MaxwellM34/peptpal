@@ -253,6 +253,18 @@ export default function InventoryDetailScreen() {
   );
 }
 
+function BatchLink({ batchId }: { batchId: number }) {
+  const router = useRouter();
+  return (
+    <TouchableOpacity
+      className="mt-2 py-1.5 px-3 border border-primary-800 rounded-lg self-start bg-primary-900/20"
+      onPress={() => router.push(`/(tabs)/inventory/batch/${batchId}`)}
+    >
+      <Text className="text-primary-300 text-xs">View batch #{batchId} →</Text>
+    </TouchableOpacity>
+  );
+}
+
 function slugifyPeptideName(name: string): string {
   return name.toLowerCase().replace(/\s*\(.*?\)\s*/g, '').trim().replace(/[^a-z0-9]+/g, '-');
 }
@@ -340,7 +352,8 @@ function VialDetailPanel({ item, vialLogs }: { item: InventoryItem; vialLogs: In
 
       {/* Batch / vendor */}
       {((item as InventoryItem & { vendor?: string | null }).vendor ||
-        (item as InventoryItem & { batch_number?: string | null }).batch_number) && (
+        (item as InventoryItem & { batch_number?: string | null }).batch_number ||
+        (item as InventoryItem & { batch_id?: number | null }).batch_id) && (
         <View className="mt-3 pt-3 border-t border-surface-border">
           <Text className="text-slate-400 text-[10px] uppercase font-semibold mb-1">Source</Text>
           {(item as InventoryItem & { vendor?: string | null }).vendor && (
@@ -357,6 +370,9 @@ function VialDetailPanel({ item, vialLogs }: { item: InventoryItem; vialLogs: In
             <Text className="text-slate-300 text-xs">
               COA purity: {(item as InventoryItem & { coa_purity_percent?: number | null }).coa_purity_percent}%
             </Text>
+          )}
+          {(item as InventoryItem & { batch_id?: number | null }).batch_id != null && (
+            <BatchLink batchId={(item as InventoryItem & { batch_id?: number | null }).batch_id!} />
           )}
         </View>
       )}
