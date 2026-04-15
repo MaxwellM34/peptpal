@@ -33,6 +33,8 @@ export default function TabsLayout() {
       <Tabs.Screen name="inventory/receive" options={{ href: null }} />
       <Tabs.Screen name="schedule/new" options={{ href: null }} />
       <Tabs.Screen name="schedule/cycles" options={{ href: null }} />
+      <Tabs.Screen name="schedule/protocols" options={{ href: null }} />
+      <Tabs.Screen name="schedule/protocol-new" options={{ href: null }} />
       <Tabs.Screen name="biomarkers" options={{ href: null }} />
       <Tabs.Screen name="community/[slug]" options={{ href: null }} />
       <Tabs.Screen name="community/new" options={{ href: null }} />

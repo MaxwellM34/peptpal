@@ -43,10 +43,16 @@ export default function ScheduleScreen() {
               <Text className="text-white font-bold">+ New Schedule</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              className="bg-surface-card border border-surface-border rounded-xl py-3 px-4 items-center active:bg-surface-elevated"
+              className="bg-surface-card border border-surface-border rounded-xl py-3 px-3 items-center active:bg-surface-elevated"
               onPress={() => router.push('/(tabs)/schedule/cycles')}
             >
               <Text className="text-slate-200 font-semibold">🔁 Cycles</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              className="bg-surface-card border border-surface-border rounded-xl py-3 px-3 items-center active:bg-surface-elevated"
+              onPress={() => router.push('/(tabs)/schedule/protocols')}
+            >
+              <Text className="text-slate-200 font-semibold">🧬 Protocols</Text>
             </TouchableOpacity>
           </View>
         }
