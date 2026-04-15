@@ -3,7 +3,7 @@
  * Personal user data — never leaves the device.
  */
 
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 export const CREATE_TABLES_SQL = `
 PRAGMA journal_mode = WAL;
@@ -73,9 +73,51 @@ CREATE TABLE IF NOT EXISTS inventory (
   coa_url                 TEXT,
   coa_purity_percent      REAL,
   counterfeit_flagged     INTEGER NOT NULL DEFAULT 0,
+  batch_id                INTEGER,
+  label_number            INTEGER,
+  photos_json             TEXT,
+  received_at             TEXT,
   notes                   TEXT,
   created_at              TEXT NOT NULL DEFAULT (datetime('now')),
   deleted_at              TEXT
+);
+
+CREATE TABLE IF NOT EXISTS batches (
+  id             INTEGER PRIMARY KEY AUTOINCREMENT,
+  vendor         TEXT,
+  received_at    TEXT NOT NULL,
+  notes          TEXT,
+  photos_json    TEXT,
+  created_at     TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at     TEXT
+);
+
+CREATE TABLE IF NOT EXISTS protocols (
+  id             INTEGER PRIMARY KEY AUTOINCREMENT,
+  name           TEXT NOT NULL,
+  goal           TEXT,
+  active         INTEGER NOT NULL DEFAULT 1,
+  created_at     TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at     TEXT
+);
+
+CREATE TABLE IF NOT EXISTS protocol_items (
+  id               INTEGER PRIMARY KEY AUTOINCREMENT,
+  protocol_id      INTEGER NOT NULL REFERENCES protocols(id) ON DELETE CASCADE,
+  peptide_ref_id   INTEGER NOT NULL,
+  peptide_name     TEXT NOT NULL,
+  peptide_slug     TEXT,
+  dose_mcg         REAL NOT NULL,
+  doses_per_week   REAL NOT NULL DEFAULT 7,
+  target_volume_ml REAL NOT NULL DEFAULT 0.10,
+  notes            TEXT
+);
+
+CREATE TABLE IF NOT EXISTS tutorial_state (
+  id            INTEGER PRIMARY KEY CHECK (id = 1),
+  completed     INTEGER NOT NULL DEFAULT 0,
+  last_step     INTEGER NOT NULL DEFAULT 0,
+  updated_at    TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
 CREATE TABLE IF NOT EXISTS reminders (
@@ -118,6 +160,8 @@ CREATE INDEX IF NOT EXISTS idx_symptoms_log_occurred_at ON symptoms_log(occurred
 CREATE INDEX IF NOT EXISTS idx_inventory_peptide_ref_id ON inventory(peptide_ref_id);
 CREATE INDEX IF NOT EXISTS idx_reminders_next_fire ON reminders(next_fire_at, sent);
 CREATE INDEX IF NOT EXISTS idx_biomarker_key_time ON biomarker_readings(biomarker_key, measured_at);
+CREATE INDEX IF NOT EXISTS idx_inventory_batch_id ON inventory(batch_id);
+CREATE INDEX IF NOT EXISTS idx_protocol_items_protocol_id ON protocol_items(protocol_id);
 `;
 
 /**
@@ -125,6 +169,49 @@ CREATE INDEX IF NOT EXISTS idx_biomarker_key_time ON biomarker_readings(biomarke
  * We use ALTER TABLE ADD COLUMN which is safe if the column doesn't exist;
  * we catch the "duplicate column" error since SQLite has no IF NOT EXISTS for columns.
  */
+export const MIGRATIONS_V2_TO_V3: string[] = [
+  `CREATE TABLE IF NOT EXISTS batches (
+     id INTEGER PRIMARY KEY AUTOINCREMENT,
+     vendor TEXT,
+     received_at TEXT NOT NULL,
+     notes TEXT,
+     photos_json TEXT,
+     created_at TEXT NOT NULL DEFAULT (datetime('now')),
+     deleted_at TEXT
+   )`,
+  `ALTER TABLE inventory ADD COLUMN batch_id INTEGER`,
+  `ALTER TABLE inventory ADD COLUMN label_number INTEGER`,
+  `ALTER TABLE inventory ADD COLUMN photos_json TEXT`,
+  `ALTER TABLE inventory ADD COLUMN received_at TEXT`,
+  `CREATE INDEX IF NOT EXISTS idx_inventory_batch_id ON inventory(batch_id)`,
+  `CREATE TABLE IF NOT EXISTS protocols (
+     id INTEGER PRIMARY KEY AUTOINCREMENT,
+     name TEXT NOT NULL,
+     goal TEXT,
+     active INTEGER NOT NULL DEFAULT 1,
+     created_at TEXT NOT NULL DEFAULT (datetime('now')),
+     deleted_at TEXT
+   )`,
+  `CREATE TABLE IF NOT EXISTS protocol_items (
+     id INTEGER PRIMARY KEY AUTOINCREMENT,
+     protocol_id INTEGER NOT NULL REFERENCES protocols(id) ON DELETE CASCADE,
+     peptide_ref_id INTEGER NOT NULL,
+     peptide_name TEXT NOT NULL,
+     peptide_slug TEXT,
+     dose_mcg REAL NOT NULL,
+     doses_per_week REAL NOT NULL DEFAULT 7,
+     target_volume_ml REAL NOT NULL DEFAULT 0.10,
+     notes TEXT
+   )`,
+  `CREATE INDEX IF NOT EXISTS idx_protocol_items_protocol_id ON protocol_items(protocol_id)`,
+  `CREATE TABLE IF NOT EXISTS tutorial_state (
+     id INTEGER PRIMARY KEY CHECK (id = 1),
+     completed INTEGER NOT NULL DEFAULT 0,
+     last_step INTEGER NOT NULL DEFAULT 0,
+     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+   )`,
+];
+
 export const MIGRATIONS_V1_TO_V2: string[] = [
   `ALTER TABLE peptides_log ADD COLUMN ae_nausea INTEGER`,
   `ALTER TABLE peptides_log ADD COLUMN ae_fatigue INTEGER`,

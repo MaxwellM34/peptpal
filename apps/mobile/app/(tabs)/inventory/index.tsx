@@ -67,12 +67,20 @@ export default function InventoryScreen() {
         keyExtractor={(item) => String(item.id)}
         contentContainerStyle={{ padding: 16 }}
         ListHeaderComponent={
-          <TouchableOpacity
-            className="bg-primary-600 rounded-xl py-3 items-center mb-4 active:bg-primary-700"
-            onPress={() => router.push('/(tabs)/inventory/new' as never)}
-          >
-            <Text className="text-white font-bold">+ Add Vial</Text>
-          </TouchableOpacity>
+          <View className="flex-row gap-2 mb-4">
+            <TouchableOpacity
+              className="flex-1 bg-primary-600 rounded-xl py-3 items-center active:bg-primary-700"
+              onPress={() => router.push('/(tabs)/inventory/receive' as never)}
+            >
+              <Text className="text-white font-bold">📦 Receive Shipment</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              className="bg-surface-card border border-surface-border rounded-xl py-3 px-3 items-center active:bg-surface-elevated"
+              onPress={() => router.push('/(tabs)/inventory/new' as never)}
+            >
+              <Text className="text-slate-200 font-semibold">+ Single Vial</Text>
+            </TouchableOpacity>
+          </View>
         }
         renderItem={({ item }) => {
           const { status, daysRecon } = getStatus(item);
@@ -85,7 +93,12 @@ export default function InventoryScreen() {
             >
               <View className="flex-row justify-between items-start">
                 <View className="flex-1">
-                  <Text className="text-white font-bold text-base">{item.peptide_name}</Text>
+                  <Text className="text-white font-bold text-base">
+                    {item.peptide_name}
+                    {(item as InventoryItem & { label_number?: number | null }).label_number
+                      ? ` #${(item as InventoryItem & { label_number?: number | null }).label_number}`
+                      : ''}
+                  </Text>
                   <Text className="text-slate-400 text-xs mt-0.5">
                     {item.vial_count} × {item.vial_size_mg}mg vial{item.vial_count !== 1 ? 's' : ''}
                   </Text>

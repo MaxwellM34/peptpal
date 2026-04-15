@@ -1,5 +1,10 @@
 import { Platform } from 'react-native';
-import { CREATE_TABLES_SQL, SCHEMA_VERSION, MIGRATIONS_V1_TO_V2 } from './schema';
+import {
+  CREATE_TABLES_SQL,
+  SCHEMA_VERSION,
+  MIGRATIONS_V1_TO_V2,
+  MIGRATIONS_V2_TO_V3,
+} from './schema';
 
 // expo-sqlite is native-only — not available in the browser
 const isWeb = Platform.OS === 'web';
@@ -27,8 +32,8 @@ async function initDb(database: AnyDb): Promise<void> {
     return;
   }
 
-  if (row.version < 2) {
-    for (const stmt of MIGRATIONS_V1_TO_V2) {
+  async function runMigration(stmts: string[]) {
+    for (const stmt of stmts) {
       try {
         await database.execAsync(stmt);
       } catch (e) {
@@ -40,6 +45,12 @@ async function initDb(database: AnyDb): Promise<void> {
         }
       }
     }
+  }
+
+  if (row.version < 2) await runMigration(MIGRATIONS_V1_TO_V2);
+  if (row.version < 3) await runMigration(MIGRATIONS_V2_TO_V3);
+
+  if (row.version < SCHEMA_VERSION) {
     await database.runAsync('UPDATE schema_version SET version = ?', [SCHEMA_VERSION]);
   }
 }

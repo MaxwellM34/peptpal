@@ -17,6 +17,10 @@ export interface CreateInventoryInput {
   coa_url?: string | null;
   coa_purity_percent?: number | null;
   counterfeit_flagged?: boolean;
+  batch_id?: number | null;
+  label_number?: number | null;
+  photo_paths?: string[];
+  received_at?: string | null;
   notes?: string | null;
 }
 
@@ -36,8 +40,8 @@ export async function createInventoryItem(input: CreateInventoryInput): Promise<
       (peptide_ref_id, peptide_name, vial_count, vial_size_mg, reconstituted,
        bac_water_added_ml, concentration_mcg_per_ml, opened_at, expiry_at,
        storage_location, vendor, batch_number, coa_url, coa_purity_percent,
-       counterfeit_flagged, notes)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       counterfeit_flagged, batch_id, label_number, photos_json, received_at, notes)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       input.peptide_ref_id,
       input.peptide_name,
@@ -54,6 +58,10 @@ export async function createInventoryItem(input: CreateInventoryInput): Promise<
       input.coa_url ?? null,
       input.coa_purity_percent ?? null,
       input.counterfeit_flagged ? 1 : 0,
+      input.batch_id ?? null,
+      input.label_number ?? null,
+      input.photo_paths && input.photo_paths.length > 0 ? JSON.stringify(input.photo_paths) : null,
+      input.received_at ?? null,
       input.notes ?? null,
     ],
   );
@@ -86,10 +94,19 @@ export async function updateInventoryItem(
 ): Promise<void> {
   if (!isDbAvailable()) return;
   const db = await getDb();
-  const fields = Object.keys(updates).map((k) => `${k} = ?`).join(', ');
-  const values = Object.values(updates).map((v) =>
-    typeof v === 'boolean' ? (v ? 1 : 0) : (v ?? null),
-  );
+  // Map photo_paths (array) to photos_json column on the way out.
+  const normalized: Record<string, string | number | null> = {};
+  for (const [k, v] of Object.entries(updates)) {
+    if (k === 'photo_paths') {
+      normalized['photos_json'] = Array.isArray(v) ? JSON.stringify(v) : null;
+    } else if (typeof v === 'boolean') {
+      normalized[k] = v ? 1 : 0;
+    } else {
+      normalized[k] = (v as string | number | null | undefined) ?? null;
+    }
+  }
+  const fields = Object.keys(normalized).map((k) => `${k} = ?`).join(', ');
+  const values = Object.values(normalized);
   await db.runAsync(`UPDATE inventory SET ${fields} WHERE id = ?`, [...values, id]);
 }
 
@@ -100,6 +117,45 @@ export async function softDeleteInventoryItem(id: number): Promise<void> {
     "UPDATE inventory SET deleted_at = datetime('now') WHERE id = ?",
     [id],
   );
+}
+
+/**
+ * Find the oldest reconstituted vial for a peptide. Oldest = earliest opened_at.
+ * Returns null if no reconstituted vials exist for this peptide.
+ */
+export async function getOldestReconstitutedVial(
+  peptide_ref_id: number,
+): Promise<InventoryItem | null> {
+  if (!isDbAvailable()) return null;
+  const db = await getDb();
+  const row = await db.getFirstAsync<Omit<InventoryItem, 'reconstituted'> & { reconstituted: number }>(
+    `SELECT * FROM inventory
+     WHERE peptide_ref_id = ?
+       AND reconstituted = 1
+       AND vial_count > 0
+       AND deleted_at IS NULL
+     ORDER BY COALESCE(opened_at, created_at) ASC
+     LIMIT 1`,
+    [peptide_ref_id],
+  );
+  if (!row) return null;
+  return { ...row, reconstituted: Boolean(row.reconstituted) };
+}
+
+/** Return all sealed (not reconstituted) vials of a peptide, oldest first. */
+export async function getSealedVials(peptide_ref_id: number): Promise<InventoryItem[]> {
+  if (!isDbAvailable()) return [];
+  const db = await getDb();
+  const rows = await db.getAllAsync<Omit<InventoryItem, 'reconstituted'> & { reconstituted: number }>(
+    `SELECT * FROM inventory
+     WHERE peptide_ref_id = ?
+       AND reconstituted = 0
+       AND vial_count > 0
+       AND deleted_at IS NULL
+     ORDER BY COALESCE(received_at, created_at) ASC`,
+    [peptide_ref_id],
+  );
+  return rows.map((r) => ({ ...r, reconstituted: Boolean(r.reconstituted) }));
 }
 
 export async function decrementVialCount(id: number): Promise<void> {
