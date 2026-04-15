@@ -15,3 +15,5 @@ export { BodyMap, SiteRotationCard } from './BodyMap';
 export type { SiteStatus, SiteInfo } from './BodyMap';
 export { SyringeDiagram } from './SyringeDiagram';
 export type { SyringeDiagramProps } from './SyringeDiagram';
+export { DoseScalingCard } from './DoseScalingCard';
+export type { DoseScalingCardProps } from './DoseScalingCard';

@@ -1,5 +1,5 @@
 import { Platform } from 'react-native';
-import { CREATE_TABLES_SQL, SCHEMA_VERSION } from './schema';
+import { CREATE_TABLES_SQL, SCHEMA_VERSION, MIGRATIONS_V1_TO_V2 } from './schema';
 
 // expo-sqlite is native-only — not available in the browser
 const isWeb = Platform.OS === 'web';
@@ -24,6 +24,23 @@ async function initDb(database: AnyDb): Promise<void> {
   );
   if (!row) {
     await database.runAsync('INSERT INTO schema_version (version) VALUES (?)', [SCHEMA_VERSION]);
+    return;
+  }
+
+  if (row.version < 2) {
+    for (const stmt of MIGRATIONS_V1_TO_V2) {
+      try {
+        await database.execAsync(stmt);
+      } catch (e) {
+        // ALTER TABLE ADD COLUMN fails with "duplicate column" if the column
+        // already exists (e.g. fresh install ran CREATE_TABLES_SQL first).
+        const msg = String(e);
+        if (!msg.includes('duplicate column') && !msg.includes('already exists')) {
+          throw e;
+        }
+      }
+    }
+    await database.runAsync('UPDATE schema_version SET version = ?', [SCHEMA_VERSION]);
   }
 }
 

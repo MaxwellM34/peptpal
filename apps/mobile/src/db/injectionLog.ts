@@ -10,6 +10,11 @@ export interface CreateInjectionLogInput {
   injection_site?: string | null;
   notes?: string | null;
   inventory_id?: number | null;
+  ae_nausea?: number | null;
+  ae_fatigue?: number | null;
+  ae_injection_site?: number | null;
+  ae_mood?: number | null;
+  ae_other?: string | null;
 }
 
 export async function createInjectionLog(input: CreateInjectionLogInput): Promise<number> {
@@ -17,8 +22,9 @@ export async function createInjectionLog(input: CreateInjectionLogInput): Promis
   const db = await getDb();
   const result = await db.runAsync(
     `INSERT INTO peptides_log
-      (peptide_ref_id, peptide_name, injected_at, dose_mcg, dose_ml, injection_site, notes, inventory_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      (peptide_ref_id, peptide_name, injected_at, dose_mcg, dose_ml, injection_site, notes, inventory_id,
+       ae_nausea, ae_fatigue, ae_injection_site, ae_mood, ae_other)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       input.peptide_ref_id,
       input.peptide_name,
@@ -28,6 +34,11 @@ export async function createInjectionLog(input: CreateInjectionLogInput): Promis
       input.injection_site ?? null,
       input.notes ?? null,
       input.inventory_id ?? null,
+      input.ae_nausea ?? null,
+      input.ae_fatigue ?? null,
+      input.ae_injection_site ?? null,
+      input.ae_mood ?? null,
+      input.ae_other ?? null,
     ],
   );
   return result.lastInsertRowId;

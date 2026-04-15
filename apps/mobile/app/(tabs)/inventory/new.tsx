@@ -24,6 +24,10 @@ export default function NewInventoryScreen() {
   const [concentrationMcgPerMl, setConcentrationMcgPerMl] = useState('');
   const [expiryAt, setExpiryAt] = useState('');
   const [storageLocation, setStorageLocation] = useState<'fridge' | 'freezer'>('fridge');
+  const [vendor, setVendor] = useState('');
+  const [batchNumber, setBatchNumber] = useState('');
+  const [coaUrl, setCoaUrl] = useState('');
+  const [coaPurity, setCoaPurity] = useState('');
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
   const [calcResult, setCalcResult] = useState<ReturnType<typeof reconstitutionCalc> | null>(null);
@@ -53,6 +57,7 @@ export default function NewInventoryScreen() {
     if (!peptideRefId || !vialSizeMg) return;
     setSaving(true);
     try {
+      const purityPercent = coaPurity ? parseFloat(coaPurity) : null;
       await createInventoryItem({
         peptide_ref_id: peptideRefId,
         peptide_name: peptideName,
@@ -64,6 +69,11 @@ export default function NewInventoryScreen() {
         opened_at: reconstituted ? new Date().toISOString() : null,
         expiry_at: expiryAt || null,
         storage_location: storageLocation,
+        vendor: vendor.trim() || null,
+        batch_number: batchNumber.trim() || null,
+        coa_url: coaUrl.trim() || null,
+        coa_purity_percent: purityPercent,
+        counterfeit_flagged: purityPercent != null && purityPercent < 80,
         notes: notes.trim() || null,
       });
       router.back();
@@ -161,6 +171,49 @@ export default function NewInventoryScreen() {
                 />
               </Card>
             )}
+
+            {/* Batch / COA */}
+            <Card className="mb-4 gap-3">
+              <Text className="text-white font-bold text-sm">Vendor & COA (optional)</Text>
+              <Text className="text-slate-400 text-xs">
+                Track batch and Certificate of Analysis data to spot subpotent or counterfeit product.
+                FDA seized counterfeit GLP-1 in 2024–2025; a 2024 compounder shipped semaglutide at 79.9% potency.
+              </Text>
+              <TextInput
+                label="Vendor"
+                placeholder="e.g. Janoshik-verified vendor"
+                value={vendor}
+                onChangeText={setVendor}
+              />
+              <TextInput
+                label="Batch / lot number"
+                placeholder="e.g. LB240915"
+                value={batchNumber}
+                onChangeText={setBatchNumber}
+              />
+              <TextInput
+                label="COA URL"
+                placeholder="https://..."
+                value={coaUrl}
+                onChangeText={setCoaUrl}
+                autoCapitalize="none"
+              />
+              <TextInput
+                label="COA purity %"
+                placeholder="e.g. 98.5"
+                keyboardType="decimal-pad"
+                value={coaPurity}
+                onChangeText={setCoaPurity}
+                hint="Below 80% will auto-flag this batch as counterfeit."
+              />
+              {coaPurity && parseFloat(coaPurity) < 80 && (
+                <View className="bg-red-900/30 border border-red-700 rounded-xl p-2">
+                  <Text className="text-red-300 text-xs">
+                    ⛔ Purity &lt;80% — this product may be subpotent or counterfeit.
+                  </Text>
+                </View>
+              )}
+            </Card>
 
             <TextInput
               label="Notes (optional)"

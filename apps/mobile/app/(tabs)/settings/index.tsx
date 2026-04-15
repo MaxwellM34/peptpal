@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, Alert, ActivityIndicator, TextInput as RNTextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as DocumentPicker from 'expo-document-picker';
@@ -10,7 +11,9 @@ import * as Crypto from 'expo-crypto';
 import { Card, Button, TextInput } from '@peptpal/ui';
 import { exportAllData, importAllData } from '../../../src/db/backup';
 import { submitCommunityReport } from '../../../src/api/client';
+import { getUserProfile, upsertUserProfile } from '../../../src/db/profile';
 import type { BackupPayload } from '../../../src/db/backup';
+import { lbsToKg, kgToLbs } from '@peptpal/core';
 
 // Simple AES-256 encryption using expo-crypto for key derivation.
 // The actual encryption uses a symmetric key derived from the passphrase.
@@ -43,6 +46,41 @@ function xorDecrypt(encoded: string, key: string): string {
 }
 
 export default function SettingsScreen() {
+  const router = useRouter();
+  const [weightLbs, setWeightLbs] = useState('');
+  const [heightIn, setHeightIn] = useState('');
+  const [age, setAge] = useState('');
+  const [sex, setSex] = useState<string | null>(null);
+  const [profileSaved, setProfileSaved] = useState(false);
+
+  const loadProfile = useCallback(async () => {
+    const p = await getUserProfile();
+    if (p) {
+      if (p.weight_kg) setWeightLbs(kgToLbs(p.weight_kg).toFixed(0));
+      if (p.height_cm) setHeightIn((p.height_cm / 2.54).toFixed(0));
+      if (p.age) setAge(String(p.age));
+      if (p.sex) setSex(p.sex);
+    }
+  }, []);
+
+  useEffect(() => { void loadProfile(); }, [loadProfile]);
+
+  async function handleSaveProfile() {
+    const lbs = parseFloat(weightLbs);
+    if (!lbs || lbs < 60 || lbs > 500) {
+      Alert.alert('Enter a valid weight', 'Weight should be between 60 and 500 lb.');
+      return;
+    }
+    await upsertUserProfile({
+      weight_kg: lbsToKg(lbs),
+      height_cm: heightIn ? parseFloat(heightIn) * 2.54 : null,
+      age: age ? parseInt(age, 10) : null,
+      sex,
+    });
+    setProfileSaved(true);
+    setTimeout(() => setProfileSaved(false), 2000);
+  }
+
   const [backupPassphrase, setBackupPassphrase] = useState('');
   const [restorePassphrase, setRestorePassphrase] = useState('');
   const [backupLoading, setBackupLoading] = useState(false);
@@ -169,6 +207,72 @@ export default function SettingsScreen() {
   return (
     <SafeAreaView className="flex-1 bg-surface" edges={['bottom']}>
       <ScrollView className="flex-1 px-4 pt-4">
+
+        {/* User Profile — drives dose scaling */}
+        <Card className="mb-4">
+          <Text className="text-white font-bold text-base mb-1">👤 Your Profile</Text>
+          <Text className="text-slate-400 text-xs mb-3">
+            Weight-adjusted dose scaling uses this. Never leaves your device.
+          </Text>
+          <View className="flex-row gap-2">
+            <View className="flex-1">
+              <TextInput
+                label="Weight (lb) *"
+                placeholder="170"
+                keyboardType="decimal-pad"
+                value={weightLbs}
+                onChangeText={setWeightLbs}
+              />
+            </View>
+            <View className="flex-1">
+              <TextInput
+                label="Height (in)"
+                placeholder="70"
+                keyboardType="decimal-pad"
+                value={heightIn}
+                onChangeText={setHeightIn}
+              />
+            </View>
+            <View className="flex-1">
+              <TextInput
+                label="Age"
+                placeholder="30"
+                keyboardType="number-pad"
+                value={age}
+                onChangeText={setAge}
+              />
+            </View>
+          </View>
+
+          <View className="flex-row gap-2 mt-3">
+            {(['male', 'female', 'other'] as const).map((s) => (
+              <TouchableOpacity
+                key={s}
+                className={`flex-1 rounded-lg py-2 items-center border ${
+                  sex === s ? 'bg-primary-600 border-primary-500' : 'bg-surface-elevated border-surface-border'
+                }`}
+                onPress={() => setSex(s)}
+              >
+                <Text className={`text-xs font-medium capitalize ${sex === s ? 'text-white' : 'text-slate-300'}`}>
+                  {s}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <View className="mt-4">
+            <Button onPress={handleSaveProfile}>
+              {profileSaved ? '✓ Saved' : 'Save Profile'}
+            </Button>
+          </View>
+
+          <TouchableOpacity
+            className="mt-3 items-center"
+            onPress={() => router.push('/(tabs)/biomarkers')}
+          >
+            <Text className="text-primary-400 text-xs">→ Track biomarkers (labs)</Text>
+          </TouchableOpacity>
+        </Card>
 
         {/* Privacy Policy */}
         <Card className="mb-4">

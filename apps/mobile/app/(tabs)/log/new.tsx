@@ -26,6 +26,10 @@ export default function NewInjectionScreen() {
   const [notes, setNotes] = useState('');
   const [inventoryId, setInventoryId] = useState<number | null>(null);
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
+  const [aeNausea, setAeNausea] = useState(0);
+  const [aeFatigue, setAeFatigue] = useState(0);
+  const [aeSite, setAeSite] = useState(0);
+  const [aeOther, setAeOther] = useState('');
   const [showDoseWarning, setShowDoseWarning] = useState(false);
   const [safetyResult, setSafetyResult] = useState<ReturnType<typeof checkDoseSafety> | null>(null);
   const [saving, setSaving] = useState(false);
@@ -81,6 +85,10 @@ export default function NewInjectionScreen() {
         injection_site: site,
         notes: notes.trim() || null,
         inventory_id: inventoryId,
+        ae_nausea: aeNausea > 0 ? aeNausea : null,
+        ae_fatigue: aeFatigue > 0 ? aeFatigue : null,
+        ae_injection_site: aeSite > 0 ? aeSite : null,
+        ae_other: aeOther.trim() || null,
       });
       if (inventoryId) {
         await decrementVialCount(inventoryId);
@@ -190,6 +198,24 @@ export default function NewInjectionScreen() {
               <InjectionSiteSelector value={site} onChange={setSite} />
             </View>
 
+            {/* Adverse Events */}
+            <View className="mb-4">
+              <Text className="text-slate-300 text-sm font-medium mb-2">Side Effects (optional)</Text>
+              <Text className="text-slate-500 text-xs mb-3">
+                Severity 0–10. Aggregated (anonymously) with community data to surface dose-specific patterns.
+              </Text>
+              <SeverityRow label="Nausea" value={aeNausea} onChange={setAeNausea} />
+              <SeverityRow label="Fatigue" value={aeFatigue} onChange={setAeFatigue} />
+              <SeverityRow label="Injection site" value={aeSite} onChange={setAeSite} />
+              <TextInput
+                label="Other"
+                placeholder="e.g. headache, mood change"
+                value={aeOther}
+                onChangeText={setAeOther}
+                className="mt-2"
+              />
+            </View>
+
             {/* Notes */}
             <View className="mb-6">
               <TextInput
@@ -222,5 +248,43 @@ export default function NewInjectionScreen() {
         />
       )}
     </>
+  );
+}
+
+function SeverityRow({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  onChange: (n: number) => void;
+}) {
+  return (
+    <View className="mb-2">
+      <View className="flex-row justify-between mb-1">
+        <Text className="text-slate-400 text-xs">{label}</Text>
+        <Text className="text-slate-300 text-xs font-semibold">
+          {value === 0 ? 'None' : `${value}/10`}
+        </Text>
+      </View>
+      <View className="flex-row gap-1">
+        {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => {
+          const active = n <= value;
+          const color =
+            n === 0 ? 'bg-surface-elevated' :
+            n <= 3 ? (active ? 'bg-emerald-600' : 'bg-surface-elevated') :
+            n <= 6 ? (active ? 'bg-amber-600' : 'bg-surface-elevated') :
+            (active ? 'bg-red-600' : 'bg-surface-elevated');
+          return (
+            <TouchableOpacity
+              key={n}
+              className={`flex-1 h-6 rounded ${color}`}
+              onPress={() => onChange(n)}
+            />
+          );
+        })}
+      </View>
+    </View>
   );
 }

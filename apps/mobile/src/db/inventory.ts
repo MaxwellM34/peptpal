@@ -12,7 +12,20 @@ export interface CreateInventoryInput {
   opened_at?: string | null;
   expiry_at?: string | null;
   storage_location?: 'fridge' | 'freezer';
+  vendor?: string | null;
+  batch_number?: string | null;
+  coa_url?: string | null;
+  coa_purity_percent?: number | null;
+  counterfeit_flagged?: boolean;
   notes?: string | null;
+}
+
+export interface InventoryItemExtended extends InventoryItem {
+  vendor: string | null;
+  batch_number: string | null;
+  coa_url: string | null;
+  coa_purity_percent: number | null;
+  counterfeit_flagged: boolean;
 }
 
 export async function createInventoryItem(input: CreateInventoryInput): Promise<number> {
@@ -22,8 +35,9 @@ export async function createInventoryItem(input: CreateInventoryInput): Promise<
     `INSERT INTO inventory
       (peptide_ref_id, peptide_name, vial_count, vial_size_mg, reconstituted,
        bac_water_added_ml, concentration_mcg_per_ml, opened_at, expiry_at,
-       storage_location, notes)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       storage_location, vendor, batch_number, coa_url, coa_purity_percent,
+       counterfeit_flagged, notes)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       input.peptide_ref_id,
       input.peptide_name,
@@ -35,6 +49,11 @@ export async function createInventoryItem(input: CreateInventoryInput): Promise<
       input.opened_at ?? null,
       input.expiry_at ?? null,
       input.storage_location ?? 'fridge',
+      input.vendor ?? null,
+      input.batch_number ?? null,
+      input.coa_url ?? null,
+      input.coa_purity_percent ?? null,
+      input.counterfeit_flagged ? 1 : 0,
       input.notes ?? null,
     ],
   );

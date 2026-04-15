@@ -1,8 +1,16 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { GOAL_PROTOCOLS, type GoalProtocol } from '@peptpal/core';
+import {
+  GOAL_PROTOCOLS,
+  PROTOCOL_SEEDS,
+  scaleDose,
+  topTier,
+  type GoalProtocol,
+} from '@peptpal/core';
+import { DoseScalingCard } from '@peptpal/ui';
+import { getUserProfile } from '../../../src/db/profile';
 
 export default function GoalsScreen() {
   const router = useRouter();
@@ -55,6 +63,15 @@ function ProtocolDetail({
   onBack: () => void;
   onOpenPeptide: (slug: string) => void;
 }) {
+  const [weightKg, setWeightKg] = useState<number | null>(null);
+
+  useEffect(() => {
+    void (async () => {
+      const p = await getUserProfile();
+      if (p?.weight_kg) setWeightKg(p.weight_kg);
+    })();
+  }, []);
+
   return (
     <SafeAreaView className="flex-1 bg-surface" edges={['bottom']}>
       <ScrollView contentContainerStyle={{ padding: 16 }}>
@@ -67,6 +84,37 @@ function ProtocolDetail({
           <Text className="text-white font-bold text-xl flex-1">{protocol.label}</Text>
         </View>
         <Text className="text-slate-400 text-sm mb-4">{protocol.description}</Text>
+
+        {weightKg == null && (
+          <View className="bg-amber-900/20 border border-amber-800 rounded-xl p-3 mb-4">
+            <Text className="text-amber-300 text-xs leading-5">
+              ⚠ Set your weight in Settings to get dose scaling. Trial cohorts averaged
+              ~250 lb — copying flat doses as a lean user can be dangerous.
+            </Text>
+          </View>
+        )}
+
+        {weightKg != null && (
+          <Section title="Weight-Scaled Starting Dose">
+            {protocol.peptides
+              .filter((p) => p.role === 'primary' && PROTOCOL_SEEDS[p.slug])
+              .map((p) => {
+                const seed = PROTOCOL_SEEDS[p.slug]!;
+                const scaled = scaleDose(seed.startingDose, { weightKg });
+                return (
+                  <View key={p.slug} className="mb-3">
+                    <DoseScalingCard
+                      peptideName={p.name}
+                      recommendation={seed.startingDose}
+                      scaled={scaled}
+                      topSourceTier={topTier(seed.sources)}
+                      sourceCount={seed.sources.length}
+                    />
+                  </View>
+                );
+              })}
+          </Section>
+        )}
 
         <Section title="Recommended Stack">
           {protocol.peptides.map((p) => (
