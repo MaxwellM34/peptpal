@@ -9,9 +9,11 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { isDbAvailable, getDb } from '../src/db/client';
 import { getTutorialState } from '../src/db/tutorial';
+import { getUserProfile } from '../src/db/profile';
 import { DisclaimerModal } from './modals/disclaimer';
 import { TutorialProvider, useTutorial } from '../src/lib/tutorialContext';
 import { TutorialOverlay } from '../src/components/TutorialOverlay';
+import { OnboardingWeightPrompt } from '../src/components/OnboardingWeightPrompt';
 
 const isWeb = Platform.OS === 'web';
 
@@ -34,6 +36,7 @@ export default function RootLayout() {
   const [ready, setReady] = useState(isWeb);
   const [showDisclaimer, setShowDisclaimer] = useState(false);
   const [needsTutorial, setNeedsTutorial] = useState(false);
+  const [needsWeight, setNeedsWeight] = useState(false);
 
   useEffect(() => {
     async function init() {
@@ -59,8 +62,11 @@ export default function RootLayout() {
         if (!ack) setShowDisclaimer(true);
 
         if (isDbAvailable()) {
-          const t = await getTutorialState();
-          if (!t?.completed) setNeedsTutorial(true);
+          const [t, profile] = await Promise.all([getTutorialState(), getUserProfile()]);
+          if (!t?.completed) {
+            setNeedsTutorial(true);
+            if (!profile?.weight_kg) setNeedsWeight(true);
+          }
         }
       } finally {
         setReady(true);
@@ -112,8 +118,16 @@ export default function RootLayout() {
                 />
               </Stack>
             </View>
-            <TutorialAutoStart enabled={!showDisclaimer && needsTutorial} onStarted={() => setNeedsTutorial(false)} />
+            <TutorialAutoStart
+              enabled={!showDisclaimer && !needsWeight && needsTutorial}
+              onStarted={() => setNeedsTutorial(false)}
+            />
             <DisclaimerModal visible={showDisclaimer} onAcknowledge={handleDisclaimerAck} />
+            <OnboardingWeightPrompt
+              visible={!showDisclaimer && needsWeight}
+              onDone={() => setNeedsWeight(false)}
+              onSkip={() => setNeedsWeight(false)}
+            />
             <TutorialOverlay />
           </TutorialProvider>
         </QueryClientProvider>

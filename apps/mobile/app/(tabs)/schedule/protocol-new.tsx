@@ -22,6 +22,7 @@ import {
 } from '@peptpal/core';
 import { usePeptideList } from '../../../src/hooks/usePeptides';
 import { createProtocol, getActiveProtocolItems } from '../../../src/db/protocols';
+import { createSchedule } from '../../../src/db/schedules';
 
 interface DraftItem {
   peptide_ref_id: number;
@@ -120,7 +121,7 @@ export default function ProtocolNew() {
     }));
     const conflicts = detectProtocolConflicts(newAsItems, existingAsItems);
 
-    const proceed = async () => {
+    const proceed = async (withSchedules: boolean) => {
       setSaving(true);
       try {
         await createProtocol({
@@ -137,11 +138,35 @@ export default function ProtocolNew() {
             notes: null,
           })),
         });
+        if (withSchedules) {
+          const today = new Date().toISOString().slice(0, 10);
+          for (const i of items) {
+            await createSchedule({
+              peptide_ref_id: i.peptide_ref_id,
+              peptide_name: i.peptide_name,
+              dose_mcg: i.dose_mcg,
+              frequency_hours: i.doses_per_week > 0 ? (7 * 24) / i.doses_per_week : null,
+              start_date: today,
+              reminder_enabled: true,
+            });
+          }
+        }
         router.back();
       } finally {
         setSaving(false);
       }
     };
+
+    // Ask: do you want matching schedules auto-created?
+    const runSave = () =>
+      Alert.alert(
+        'Create matching schedules?',
+        'PeptPal can auto-create per-peptide schedules with reminder cadence from this protocol.',
+        [
+          { text: 'Just protocol', onPress: () => void proceed(false) },
+          { text: 'Create schedules', onPress: () => void proceed(true) },
+        ],
+      );
 
     if (conflicts.length > 0) {
       Alert.alert(
@@ -149,11 +174,11 @@ export default function ProtocolNew() {
         conflicts.map((c) => `• ${c.message}`).join('\n\n'),
         [
           { text: 'Cancel', style: 'cancel' },
-          { text: 'Save anyway', onPress: proceed },
+          { text: 'Save anyway', onPress: runSave },
         ],
       );
     } else {
-      await proceed();
+      runSave();
     }
   }
 
