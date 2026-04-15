@@ -44,6 +44,12 @@ export default function LibraryScreen() {
         >
           <Text className="text-slate-200 text-xs font-semibold">🧪 Blend Compat</Text>
         </TouchableOpacity>
+        <TouchableOpacity
+          className="flex-1 bg-surface-card border border-surface-border rounded-xl py-2 items-center active:bg-surface-elevated"
+          onPress={() => router.push('/(tabs)/community')}
+        >
+          <Text className="text-slate-200 text-xs font-semibold">💬 Community</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Search bar */}

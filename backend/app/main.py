@@ -9,7 +9,7 @@ from slowapi.util import get_remote_address
 from tortoise.contrib.fastapi import RegisterTortoise
 
 from app.config import settings, TORTOISE_ORM
-from app.routers import peptides, community, admin
+from app.routers import admin, community, forum, peptides
 
 limiter = Limiter(key_func=get_remote_address)
 
@@ -54,6 +54,7 @@ async def rate_limit_submissions(request: Request, call_next):
 
 app.include_router(peptides.router)
 app.include_router(community.router)
+app.include_router(forum.router)
 app.include_router(admin.router)
 
 

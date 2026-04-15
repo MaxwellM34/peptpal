@@ -21,7 +21,7 @@ TORTOISE_ORM = {
     'connections': {'default': settings.database_url},
     'apps': {
         'models': {
-            'models': ['app.models.peptide', 'aerich.models'],
+            'models': ['app.models.peptide', 'app.models.community', 'aerich.models'],
             'default_connection': 'default',
         }
     },
