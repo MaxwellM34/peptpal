@@ -6,11 +6,22 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, Stack } from 'expo-router';
 import { format } from 'date-fns';
 import { TextInput, Button, InjectionSiteSelector, DoseWarningModal } from '@peptpal/ui';
-import { checkDoseSafety, calcDrawVolume } from '@peptpal/core';
+import {
+  checkDoseSafety,
+  calcDrawVolume,
+  remainingPotency,
+  storageStateFromVial,
+  doseCompensationMultiplier,
+} from '@peptpal/core';
 import type { InjectionSite } from '@peptpal/core';
 import { usePeptideList } from '../../../src/hooks/usePeptides';
 import { createInjectionLog } from '../../../src/db/injectionLog';
-import { getInventoryItems, decrementVialCount } from '../../../src/db/inventory';
+import {
+  getInventoryItems,
+  decrementVialCount,
+  getOldestReconstitutedVial,
+  getSealedVials,
+} from '../../../src/db/inventory';
 import type { InventoryItem } from '@peptpal/core';
 
 export default function NewInjectionScreen() {
@@ -26,6 +37,9 @@ export default function NewInjectionScreen() {
   const [notes, setNotes] = useState('');
   const [inventoryId, setInventoryId] = useState<number | null>(null);
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
+  const [suggestedVial, setSuggestedVial] = useState<InventoryItem | null>(null);
+  const [sealedVials, setSealedVials] = useState<InventoryItem[]>([]);
+  const [stabilityOverride, setStabilityOverride] = useState(false);
   const [aeNausea, setAeNausea] = useState(0);
   const [aeFatigue, setAeFatigue] = useState(0);
   const [aeSite, setAeSite] = useState(0);
@@ -40,6 +54,24 @@ export default function NewInjectionScreen() {
       setInventoryItems(items.filter((i) => i.reconstituted));
     });
   }, []);
+
+  // When peptide is selected, find oldest reconstituted vial (FIFO) and sealed vials.
+  useEffect(() => {
+    if (!peptideRefId) {
+      setSuggestedVial(null);
+      setSealedVials([]);
+      return;
+    }
+    void (async () => {
+      const [oldest, sealed] = await Promise.all([
+        getOldestReconstitutedVial(peptideRefId),
+        getSealedVials(peptideRefId),
+      ]);
+      setSuggestedVial(oldest);
+      setSealedVials(sealed);
+      if (oldest && inventoryId == null) setInventoryId(oldest.id);
+    })();
+  }, [peptideRefId, inventoryId]);
 
   // Auto-calculate draw volume
   const selectedInventory = inventoryItems.find((i) => i.id === inventoryId);
@@ -135,6 +167,17 @@ export default function NewInjectionScreen() {
               </ScrollView>
               {errors['peptide'] && <Text className="text-danger-400 text-xs mt-1">{errors['peptide']}</Text>}
             </View>
+
+            {/* Vial suggestion */}
+            {peptideRefId != null && (
+              <VialSuggestion
+                suggested={suggestedVial}
+                sealedCount={sealedVials.length}
+                peptideName={peptideName}
+                stabilityOverride={stabilityOverride}
+                onOverride={() => setStabilityOverride(true)}
+              />
+            )}
 
             {/* Dose */}
             <View className="mb-4">
@@ -249,6 +292,90 @@ export default function NewInjectionScreen() {
       )}
     </>
   );
+}
+
+function VialSuggestion({
+  suggested,
+  sealedCount,
+  peptideName,
+  stabilityOverride,
+  onOverride,
+}: {
+  suggested: InventoryItem | null;
+  sealedCount: number;
+  peptideName: string;
+  stabilityOverride: boolean;
+  onOverride: () => void;
+}) {
+  if (!suggested) {
+    return (
+      <View className="bg-amber-900/20 border border-amber-800 rounded-xl p-3 mb-4">
+        <Text className="text-amber-300 font-semibold text-sm mb-1">
+          No reconstituted {peptideName} available
+        </Text>
+        <Text className="text-amber-200/80 text-xs leading-5">
+          {sealedCount > 0
+            ? `You have ${sealedCount} sealed vial${sealedCount === 1 ? '' : 's'} in inventory. Reconstitute one before logging.`
+            : 'You have no vials of this peptide. Add one via Inventory → Receive Shipment.'}
+        </Text>
+      </View>
+    );
+  }
+
+  const labelNum = (suggested as InventoryItem & { label_number?: number | null }).label_number;
+  const daysSinceOpen = suggested.opened_at
+    ? (Date.now() - new Date(suggested.opened_at).getTime()) / 86_400_000
+    : 0;
+  const slug = slugifyPeptide(suggested.peptide_name);
+  const state = storageStateFromVial({
+    reconstituted: suggested.reconstituted,
+    storage_location: suggested.storage_location,
+  });
+  const potency = remainingPotency(slug, state, daysSinceOpen);
+  const pct = Math.round(potency * 100);
+
+  const warn = potency < 0.6;
+
+  if (warn && !stabilityOverride) {
+    return (
+      <View className="bg-red-900/30 border border-red-700 rounded-xl p-3 mb-4">
+        <Text className="text-red-300 font-bold text-sm mb-1">
+          ⚠ Oldest vial is estimated at {pct}% potency
+        </Text>
+        <Text className="text-red-200/80 text-xs leading-5 mb-2">
+          Use <Text className="font-bold">{peptideName} #{labelNum ?? '?'}</Text>, opened{' '}
+          {Math.floor(daysSinceOpen)} days ago.
+        </Text>
+        <Text className="text-slate-400 text-xs leading-5 mb-2">
+          You could: reconstitute a fresher vial, compensate dose by{' '}
+          {doseCompensationMultiplier(potency).toFixed(2)}×, or proceed anyway. Peptide
+          degradation estimates are uncertain — ±30%+ is typical.
+        </Text>
+        <TouchableOpacity
+          className="py-2 rounded-lg bg-red-900/50 border border-red-700 items-center"
+          onPress={onOverride}
+        >
+          <Text className="text-red-200 text-xs font-semibold">I understand, proceed</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  return (
+    <View className="bg-emerald-900/20 border border-emerald-800 rounded-xl p-3 mb-4">
+      <Text className="text-emerald-300 font-semibold text-sm mb-1">
+        Use {peptideName} #{labelNum ?? '?'} (oldest first)
+      </Text>
+      <Text className="text-slate-300 text-xs leading-5">
+        Opened {Math.floor(daysSinceOpen)} days ago · est. {pct}% potency ·{' '}
+        {suggested.concentration_mcg_per_ml ?? '?'} mcg/mL
+      </Text>
+    </View>
+  );
+}
+
+function slugifyPeptide(name: string): string {
+  return name.toLowerCase().replace(/\s*\(.*?\)\s*/g, '').trim().replace(/[^a-z0-9]+/g, '-');
 }
 
 function SeverityRow({
