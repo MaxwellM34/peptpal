@@ -49,10 +49,21 @@ done
 
 extract_tunnel_url() {
   local log_file="$1"
+  local label="$2"
   local url=""
-  for _ in $(seq 1 30); do
-    url=$(grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' "$log_file" 2>/dev/null | head -1)
-    [[ -n "$url" ]] && echo "$url" && return 0
+  # Cloudflared quick tunnels usually print a URL within 5–15s but can take
+  # 45+ seconds on slow networks. Poll for up to 90s.
+  for i in $(seq 1 90); do
+    # Use `strings` to defang ANSI color codes cloudflared injects.
+    url=$(strings "$log_file" 2>/dev/null | grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' | head -1)
+    if [[ -n "$url" ]]; then
+      echo "$url"
+      return 0
+    fi
+    # Progress dot every 5s so user sees it isn't stuck.
+    if (( i % 5 == 0 )); then
+      printf "  %s tunnel: still waiting (%ds)…\n" "$label" "$i" >&2
+    fi
     sleep 1
   done
   return 1
@@ -63,7 +74,7 @@ echo "→ starting API tunnel (port 8000)…"
 "$CLOUDFLARED" tunnel --url http://localhost:8000 >"$API_LOG" 2>&1 &
 API_PID=$!
 
-API_URL=$(extract_tunnel_url "$API_LOG") || { echo "  API tunnel failed. See $API_LOG"; exit 1; }
+API_URL=$(extract_tunnel_url "$API_LOG" "API") || { echo "  API tunnel failed. See $API_LOG"; exit 1; }
 echo "  API  → $API_URL"
 
 echo "→ starting Metro tunnel (port 8081)…"
@@ -71,7 +82,7 @@ echo "→ starting Metro tunnel (port 8081)…"
 "$CLOUDFLARED" tunnel --url http://localhost:8081 >"$METRO_LOG" 2>&1 &
 METRO_TUN_PID=$!
 
-METRO_URL=$(extract_tunnel_url "$METRO_LOG") || { echo "  Metro tunnel failed. See $METRO_LOG"; exit 1; }
+METRO_URL=$(extract_tunnel_url "$METRO_LOG" "Metro") || { echo "  Metro tunnel failed. See $METRO_LOG"; exit 1; }
 echo "  Metro→ $METRO_URL"
 
 echo "→ writing $ENV_FILE"
