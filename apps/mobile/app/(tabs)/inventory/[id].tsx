@@ -1,20 +1,28 @@
 import React, { useEffect, useState } from 'react';
 import {
-  View, Text, ScrollView, KeyboardAvoidingView, Platform, TouchableOpacity,
+  View, Text, ScrollView, KeyboardAvoidingView, Platform, TouchableOpacity, Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { format } from 'date-fns';
-import { TextInput, Button, Card } from '@peptpal/ui';
-import { reconstitutionCalc, suggestExpiryDate } from '@peptpal/core';
+import { TextInput, Button, Card, DegradationChart } from '@peptpal/ui';
+import {
+  reconstitutionCalc,
+  suggestExpiryDate,
+  remainingPotency,
+  storageStateFromVial,
+  buildDegradationCurve,
+} from '@peptpal/core';
 import {
   getInventoryItemById,
   updateInventoryItem,
   softDeleteInventoryItem,
   createInventoryItem,
 } from '../../../src/db/inventory';
+import { getInjectionLogs } from '../../../src/db/injectionLog';
+import { resolvePhotoUri } from '../../../src/lib/photos';
 import { usePeptideList } from '../../../src/hooks/usePeptides';
-import type { InventoryItem } from '@peptpal/core';
+import type { InventoryItem, InjectionLog } from '@peptpal/core';
 
 export default function InventoryDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -23,6 +31,7 @@ export default function InventoryDetailScreen() {
 
   const { data: peptideList } = usePeptideList();
   const [item, setItem] = useState<InventoryItem | null>(null);
+  const [vialLogs, setVialLogs] = useState<InjectionLog[]>([]);
 
   // Form state
   const [peptideRefId, setPeptideRefId] = useState<number | null>(null);
@@ -43,9 +52,12 @@ export default function InventoryDetailScreen() {
 
   useEffect(() => {
     if (!isNew && id) {
-      getInventoryItemById(parseInt(id)).then((data) => {
+      getInventoryItemById(parseInt(id)).then(async (data) => {
         if (!data) return;
         setItem(data);
+        // Load injections drawn from this vial.
+        const allLogs = await getInjectionLogs({ limit: 500 });
+        setVialLogs(allLogs.filter((l) => (l as InjectionLog & { inventory_id?: number | null }).inventory_id === data.id));
         setPeptideRefId(data.peptide_ref_id);
         setPeptideName(data.peptide_name);
         setVialCount(String(data.vial_count));
@@ -125,6 +137,9 @@ export default function InventoryDetailScreen() {
       <SafeAreaView className="flex-1 bg-surface" edges={['bottom']}>
         <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
           <ScrollView className="flex-1 px-4 pt-4" keyboardShouldPersistTaps="handled">
+
+            {/* Detail panel — only when viewing an existing vial */}
+            {!isNew && item && <VialDetailPanel item={item} vialLogs={vialLogs} />}
 
             {/* Peptide picker */}
             <View className="mb-4">
@@ -235,5 +250,116 @@ export default function InventoryDetailScreen() {
         </KeyboardAvoidingView>
       </SafeAreaView>
     </>
+  );
+}
+
+function slugifyPeptideName(name: string): string {
+  return name.toLowerCase().replace(/\s*\(.*?\)\s*/g, '').trim().replace(/[^a-z0-9]+/g, '-');
+}
+
+function VialDetailPanel({ item, vialLogs }: { item: InventoryItem; vialLogs: InjectionLog[] }) {
+  const photos = (() => {
+    const raw = (item as InventoryItem & { photos_json?: string | null }).photos_json;
+    if (!raw) return [] as string[];
+    try {
+      const v = JSON.parse(raw);
+      return Array.isArray(v) ? (v as string[]) : [];
+    } catch {
+      return [];
+    }
+  })();
+
+  const label = (item as InventoryItem & { label_number?: number | null }).label_number;
+  const slug = slugifyPeptideName(item.peptide_name);
+
+  const daysRecon =
+    item.reconstituted && item.opened_at
+      ? (Date.now() - new Date(item.opened_at).getTime()) / 86_400_000
+      : null;
+  const state = storageStateFromVial(item);
+  const potency = daysRecon != null ? remainingPotency(slug, state, daysRecon) : 1;
+
+  return (
+    <Card className="mb-4">
+      <Text className="text-white font-bold text-base mb-1">
+        {item.peptide_name}{label ? ` #${label}` : ''}
+      </Text>
+      <Text className="text-slate-400 text-xs mb-3">
+        {item.vial_size_mg} mg · {item.storage_location}
+        {item.reconstituted ? ` · reconstituted ${daysRecon != null ? `${Math.floor(daysRecon)}d ago` : ''}` : ' · sealed'}
+      </Text>
+
+      {/* Photos */}
+      {photos.length > 0 && (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-3">
+          <View className="flex-row gap-2">
+            {photos.map((p, i) => (
+              <Image
+                key={i}
+                source={{ uri: resolvePhotoUri(p) }}
+                style={{ width: 80, height: 80, borderRadius: 8 }}
+              />
+            ))}
+          </View>
+        </ScrollView>
+      )}
+
+      {/* Degradation chart */}
+      {item.reconstituted && daysRecon != null && (
+        <View className="mt-2">
+          <DegradationChart
+            points={buildDegradationCurve(slug, state, Date.now() - daysRecon * 86_400_000, 60, 60)}
+            currentPotency={potency}
+            daysInState={daysRecon}
+            totalDays={60}
+            width={300}
+            height={150}
+          />
+        </View>
+      )}
+
+      {/* Injection history */}
+      {vialLogs.length > 0 && (
+        <View className="mt-3 pt-3 border-t border-surface-border">
+          <Text className="text-slate-400 text-[10px] uppercase font-semibold mb-2">
+            Injections from this vial ({vialLogs.length})
+          </Text>
+          {vialLogs.slice(0, 5).map((log) => (
+            <View key={log.id} className="flex-row justify-between py-1">
+              <Text className="text-slate-300 text-xs">
+                {format(new Date(log.injected_at), 'MMM d, h:mm a')}
+              </Text>
+              <Text className="text-slate-400 text-xs">{log.dose_mcg} mcg</Text>
+            </View>
+          ))}
+          {vialLogs.length > 5 && (
+            <Text className="text-slate-500 text-[10px] mt-1">+ {vialLogs.length - 5} more</Text>
+          )}
+        </View>
+      )}
+
+      {/* Batch / vendor */}
+      {((item as InventoryItem & { vendor?: string | null }).vendor ||
+        (item as InventoryItem & { batch_number?: string | null }).batch_number) && (
+        <View className="mt-3 pt-3 border-t border-surface-border">
+          <Text className="text-slate-400 text-[10px] uppercase font-semibold mb-1">Source</Text>
+          {(item as InventoryItem & { vendor?: string | null }).vendor && (
+            <Text className="text-slate-300 text-xs">
+              Vendor: {(item as InventoryItem & { vendor?: string | null }).vendor}
+            </Text>
+          )}
+          {(item as InventoryItem & { batch_number?: string | null }).batch_number && (
+            <Text className="text-slate-300 text-xs">
+              Batch: {(item as InventoryItem & { batch_number?: string | null }).batch_number}
+            </Text>
+          )}
+          {(item as InventoryItem & { coa_purity_percent?: number | null }).coa_purity_percent != null && (
+            <Text className="text-slate-300 text-xs">
+              COA purity: {(item as InventoryItem & { coa_purity_percent?: number | null }).coa_purity_percent}%
+            </Text>
+          )}
+        </View>
+      )}
+    </Card>
   );
 }
