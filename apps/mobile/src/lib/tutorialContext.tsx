@@ -209,6 +209,37 @@ export function useTutorial(): TutorialContextValue {
 }
 
 /**
+ * Attach this to a screen's ScrollView / FlatList so that whenever the
+ * tutorial is active (or advances a step), the screen snaps back to top.
+ * Keeps hotspots near the top of the screen in view when the user navigates
+ * to them mid-tutorial.
+ *
+ * Screens pass their scroll ref. Works with both ScrollView and FlatList.
+ */
+// Scroll ref type is deliberately loose — accepts ScrollView or any FlatList<T>.
+export type ScrollResetRef = React.RefObject<
+  { scrollTo?: (opts: { y: number; animated: boolean }) => void;
+    scrollToOffset?: (opts: { offset: number; animated: boolean }) => void; } | null
+>;
+
+export function useTutorialScrollReset(scrollRef: ScrollResetRef) {
+  const { active, stepIndex } = useTutorial();
+  useEffect(() => {
+    if (!active) return;
+    const t = setTimeout(() => {
+      const node = scrollRef.current;
+      if (!node) return;
+      if (typeof node.scrollToOffset === 'function') {
+        node.scrollToOffset({ offset: 0, animated: false });
+      } else if (typeof node.scrollTo === 'function') {
+        node.scrollTo({ y: 0, animated: false });
+      }
+    }, 80);
+    return () => clearTimeout(t);
+  }, [active, stepIndex, scrollRef]);
+}
+
+/**
  * Hook: attach to a real UI element to register it as a tutorial hotspot.
  *
  * Registers on every layout change — never gated on tutorial-active. If the

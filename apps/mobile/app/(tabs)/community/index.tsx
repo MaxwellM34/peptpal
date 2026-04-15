@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
+import { useTutorialScrollReset } from '../../../src/lib/tutorialContext';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import {
@@ -17,6 +18,8 @@ export default function CommunityIndex() {
   const router = useRouter();
   const [section, setSection] = useState<Section>('internal');
   const [persona, setPersona] = useState<PersonaKey>('health_optimizer');
+  const scrollRef = useRef<ScrollView>(null);
+  useTutorialScrollReset(scrollRef);
 
   useEffect(() => {
     void (async () => {
@@ -31,7 +34,7 @@ export default function CommunityIndex() {
 
   return (
     <SafeAreaView className="flex-1 bg-surface" edges={['bottom']}>
-      <ScrollView contentContainerStyle={{ padding: 16 }}>
+      <ScrollView ref={scrollRef} contentContainerStyle={{ padding: 16 }}>
         <Text className="text-slate-200 text-base font-bold mb-1">Community</Text>
         <Text className="text-slate-500 text-xs mb-4">
           Two streams: curated external consensus, and live PeptPal-internal dose logs.

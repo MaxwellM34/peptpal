@@ -1,10 +1,10 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { View, Text, FlatList, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { format } from 'date-fns';
 import { Badge } from '@peptpal/ui';
-import { useTutorialHotspot } from '../../../src/lib/tutorialContext';
+import { useTutorialHotspot, useTutorialScrollReset } from '../../../src/lib/tutorialContext';
 import { getInjectionLogs, softDeleteInjectionLog } from '../../../src/db/injectionLog';
 import type { InjectionLog } from '@peptpal/core';
 
@@ -12,6 +12,8 @@ export default function LogHistoryScreen() {
   const router = useRouter();
   const [logs, setLogs] = useState<InjectionLog[]>([]);
   const levelsHotspot = useTutorialHotspot('log.levels_button');
+  const listRef = useRef<FlatList<InjectionLog>>(null);
+  useTutorialScrollReset(listRef);
 
   const load = useCallback(async () => {
     const data = await getInjectionLogs();
@@ -28,6 +30,7 @@ export default function LogHistoryScreen() {
   return (
     <SafeAreaView className="flex-1 bg-surface" edges={['bottom']}>
       <FlatList
+        ref={listRef}
         data={logs}
         keyExtractor={(item) => String(item.id)}
         contentContainerStyle={{ padding: 16 }}

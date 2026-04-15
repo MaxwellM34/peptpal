@@ -1,10 +1,10 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { View, Text, FlatList, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { format } from 'date-fns';
 import { Badge, DegradationChart } from '@peptpal/ui';
-import { useTutorialHotspot } from '../../../src/lib/tutorialContext';
+import { useTutorialHotspot, useTutorialScrollReset } from '../../../src/lib/tutorialContext';
 import {
   estimateRemainingDoses,
   remainingPotency,
@@ -60,6 +60,8 @@ export default function InventoryScreen() {
   const router = useRouter();
   const [items, setItems] = useState<InventoryItem[]>([]);
   const receiveHotspot = useTutorialHotspot('inventory.receive_button');
+  const listRef = useRef<FlatList<InventoryItem>>(null);
+  useTutorialScrollReset(listRef);
 
   const load = useCallback(async () => {
     const data = await getInventoryItems();
@@ -71,6 +73,7 @@ export default function InventoryScreen() {
   return (
     <SafeAreaView className="flex-1 bg-surface" edges={['bottom']}>
       <FlatList
+        ref={listRef}
         data={items}
         keyExtractor={(item) => String(item.id)}
         contentContainerStyle={{ padding: 16 }}

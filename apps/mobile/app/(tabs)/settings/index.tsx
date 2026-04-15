@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, Alert, ActivityIndicator, TextInput as RNTextInput,
 } from 'react-native';
@@ -13,7 +13,7 @@ import { exportAllData, importAllData } from '../../../src/db/backup';
 import { submitCommunityReport } from '../../../src/api/client';
 import { getUserProfile, upsertUserProfile } from '../../../src/db/profile';
 import { resetTutorial } from '../../../src/db/tutorial';
-import { useTutorial, useTutorialHotspot } from '../../../src/lib/tutorialContext';
+import { useTutorial, useTutorialHotspot, useTutorialScrollReset } from '../../../src/lib/tutorialContext';
 import type { BackupPayload } from '../../../src/db/backup';
 import { lbsToKg, kgToLbs, PERSONAS, PERSONA_ORDER, type PersonaKey } from '@peptpal/core';
 
@@ -52,6 +52,8 @@ export default function SettingsScreen() {
   const { start: startTutorial } = useTutorial();
   const weightHotspot = useTutorialHotspot('settings.weight_input');
   const personaHotspot = useTutorialHotspot('settings.persona_list');
+  const scrollRef = useRef<ScrollView>(null);
+  useTutorialScrollReset(scrollRef);
   const [weightLbs, setWeightLbs] = useState('');
   const [heightIn, setHeightIn] = useState('');
   const [age, setAge] = useState('');
@@ -216,7 +218,7 @@ export default function SettingsScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-surface" edges={['bottom']}>
-      <ScrollView className="flex-1 px-4 pt-4">
+      <ScrollView ref={scrollRef} className="flex-1 px-4 pt-4">
 
         {/* User Profile — drives dose scaling */}
         <Card className="mb-4">
