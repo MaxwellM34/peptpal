@@ -453,7 +453,11 @@ export default function SettingsScreen() {
             variant="secondary"
             onPress={async () => {
               await resetTutorial();
-              startTutorial();
+              // Navigate home first so the tutorial starts from the same state
+              // as a fresh app launch — otherwise Settings is already scrolled
+              // and hotspots further up the page can't be measured.
+              router.push('/(tabs)');
+              setTimeout(() => startTutorial(), 300);
             }}
           >
             Replay Tutorial

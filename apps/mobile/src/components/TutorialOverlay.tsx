@@ -30,7 +30,7 @@ import { PeptPalMascot, SpeechBubble } from './PeptPalMascot';
 import { useTutorial } from '../lib/tutorialContext';
 import { markTutorialComplete } from '../db/tutorial';
 
-const DIM = 'rgba(2, 6, 23, 0.82)';
+const DIM = 'rgba(2, 6, 23, 0.45)';
 const PAD = 8; // spotlight padding around the hotspot
 
 export function TutorialOverlay() {
