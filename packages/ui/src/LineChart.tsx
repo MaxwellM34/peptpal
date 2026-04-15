@@ -25,6 +25,12 @@ export interface LineChartProps {
   normalize?: boolean;
   /** Mark each series's peak with a dot + label */
   showPeaks?: boolean;
+  /**
+   * Render a ±fraction shaded band around each line (e.g. 0.3 = ±30%).
+   * Communicates the real-world variance from supplier purity, reconstitution
+   * accuracy, injection technique, and absorption differences.
+   */
+  variabilityFraction?: number;
 }
 
 const PADDING_LEFT = 44;
@@ -43,6 +49,7 @@ export function LineChart({
   nowMs,
   normalize = false,
   showPeaks = false,
+  variabilityFraction,
 }: LineChartProps) {
   const plotW = Math.max(1, width - PADDING_LEFT - PADDING_RIGHT);
   const plotH = Math.max(1, height - PADDING_TOP - PADDING_BOTTOM);
@@ -151,8 +158,21 @@ export function LineChart({
             first && last
               ? `${smoothD} L ${last[0].toFixed(2)} ${baselineY.toFixed(2)} L ${first[0].toFixed(2)} ${baselineY.toFixed(2)} Z`
               : '';
+
+          // Variability envelope: shaded ± band around the line.
+          let envelopeD = '';
+          if (variabilityFraction && variabilityFraction > 0) {
+            const upper = s.points.map((p) => [xScale(p.t), yScale(p.mcg * (1 + variabilityFraction))] as const);
+            const lower = s.points.map((p) => [xScale(p.t), yScale(Math.max(0, p.mcg * (1 - variabilityFraction)))] as const);
+            envelopeD =
+              'M ' + upper.map((c) => `${c[0].toFixed(2)} ${c[1].toFixed(2)}`).join(' L ') +
+              ' L ' + [...lower].reverse().map((c) => `${c[0].toFixed(2)} ${c[1].toFixed(2)}`).join(' L ') +
+              ' Z';
+          }
+
           return (
             <React.Fragment key={`s-${i}`}>
+              {envelopeD ? <Path d={envelopeD} fill={s.color} opacity={0.12} /> : null}
               {areaD ? <Path d={areaD} fill={`url(#fill-${i})`} /> : null}
               <Path d={smoothD} fill="none" stroke={s.color} strokeWidth={2} />
             </React.Fragment>

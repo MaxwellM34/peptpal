@@ -26,6 +26,7 @@ export default function PkChartScreen() {
   const [logs, setLogs] = useState<InjectionLog[]>([]);
   const [range, setRange] = useState<RangeKey>('7d');
   const [normalize, setNormalize] = useState(false);
+  const [showVariability, setShowVariability] = useState(true);
   const [hidden, setHidden] = useState<Set<string>>(new Set());
   const peptideListQuery = usePeptideList();
 
@@ -110,12 +111,38 @@ export default function PkChartScreen() {
               {normalize ? '% peak' : 'mcg'}
             </Text>
           </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => setShowVariability((v) => !v)}
+            className={`px-3 py-2 rounded-full border ${
+              showVariability
+                ? 'bg-amber-900/30 border-amber-700'
+                : 'bg-surface-card border-surface-border'
+            }`}
+          >
+            <Text className={`text-xs font-semibold ${showVariability ? 'text-amber-300' : 'text-slate-300'}`}>
+              ±band
+            </Text>
+          </TouchableOpacity>
         </View>
-        <Text className="text-slate-500 text-[10px] mb-4">
+        <Text className="text-slate-500 text-[10px] mb-2">
           {normalize
             ? 'Each curve scaled to its own peak — compare shapes across peptides with very different doses.'
             : 'Absolute concentrations in mcg.'}
         </Text>
+
+        {showVariability && (
+          <View className="bg-amber-900/20 border border-amber-800 rounded-xl p-3 mb-4">
+            <Text className="text-amber-300 text-xs font-bold mb-1">
+              ⚠ Variability band is shown (±30%)
+            </Text>
+            <Text className="text-amber-200/80 text-xs leading-5">
+              Even with a good supplier, actual blood levels can vary ±30%+ from the curve.
+              Peptides are not calibrated pharmaceuticals — injections, reconstitution
+              technique, absorption, and purity all introduce uncertainty. These lines are
+              estimates, not measurements.
+            </Text>
+          </View>
+        )}
 
         {!hasData ? (
           <View className="bg-surface-card rounded-2xl py-12 items-center">
@@ -135,6 +162,7 @@ export default function PkChartScreen() {
                 nowMs={nowMs}
                 normalize={normalize}
                 showPeaks
+                variabilityFraction={showVariability ? 0.30 : undefined}
               />
               <View className="flex-row flex-wrap gap-2 mt-3">
                 {series.map((s) => {
@@ -197,6 +225,7 @@ export default function PkChartScreen() {
                     nowMs={nowMs}
                     normalize={false}
                     showPeaks
+                    variabilityFraction={showVariability ? 0.30 : undefined}
                   />
                 </View>
               );
