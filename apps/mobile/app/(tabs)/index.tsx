@@ -147,6 +147,35 @@ export default function DashboardScreen() {
           </View>
         )}
 
+        {/* Today's plan from active protocols */}
+        {activeProtocols.length > 0 && (
+          <View className="bg-surface-card rounded-2xl p-3 mb-4 border border-surface-border">
+            <View className="flex-row items-center justify-between mb-2">
+              <Text className="text-slate-400 text-[10px] uppercase font-semibold">Today's plan</Text>
+              <Text className="text-slate-500 text-[10px]">
+                from {activeProtocols.length} protocol{activeProtocols.length === 1 ? '' : 's'}
+              </Text>
+            </View>
+            {activeProtocols
+              .flatMap((p) => p.items.map((i) => ({ ...i, protocolName: p.name })))
+              .filter((i) => i.doses_per_week >= 1) // weekly+ peptides show up daily-ish
+              .slice(0, 6)
+              .map((i, idx) => (
+                <View key={idx} className="flex-row items-center justify-between py-1">
+                  <View className="flex-1">
+                    <Text className="text-slate-200 text-xs font-semibold">
+                      {i.peptide_name}
+                    </Text>
+                    <Text className="text-slate-500 text-[10px]">
+                      {i.protocolName} · {i.doses_per_week.toFixed(1)}×/wk
+                    </Text>
+                  </View>
+                  <Text className="text-slate-300 text-xs font-semibold">{i.dose_mcg} mcg</Text>
+                </View>
+              ))}
+          </View>
+        )}
+
         {/* Next dose from active protocol */}
         {nextDose && (
           <TouchableOpacity

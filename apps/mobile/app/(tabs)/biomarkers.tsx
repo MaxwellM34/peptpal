@@ -18,6 +18,7 @@ import {
   deleteBiomarkerReading,
   type BiomarkerRow,
 } from '../../src/db/biomarkers';
+import { getActiveProtocolItems } from '../../src/db/protocols';
 
 export default function BiomarkersScreen() {
   const [rows, setRows] = useState<BiomarkerRow[]>([]);
@@ -25,9 +26,23 @@ export default function BiomarkersScreen() {
   const [selectedKey, setSelectedKey] = useState<BiomarkerKey | null>(null);
   const [value, setValue] = useState('');
   const [measuredAt, setMeasuredAt] = useState(new Date().toISOString().slice(0, 10));
+  const [recommendedCats, setRecommendedCats] = useState<BiomarkerCategory[]>([]);
 
   const load = useCallback(async () => {
-    setRows(await getBiomarkerReadings());
+    const [readings, items] = await Promise.all([
+      getBiomarkerReadings(),
+      getActiveProtocolItems(),
+    ]);
+    setRows(readings);
+    // Compute which panels the user should be tracking based on their active protocols.
+    const cats = new Set<BiomarkerCategory>();
+    for (const p of items) {
+      const slug = p.peptide_slug ?? '';
+      if (['cjc-1295', 'ipamorelin', 'hexarelin', 'tesamorelin'].includes(slug)) cats.add('gh');
+      else if (['semaglutide', 'tirzepatide', 'retatrutide'].includes(slug)) cats.add('glp1');
+      else if (['bpc-157', 'tb-500', 'ghk-cu-injectable', 'glow'].includes(slug)) cats.add('healing');
+    }
+    setRecommendedCats(Array.from(cats));
   }, []);
 
   useFocusEffect(useCallback(() => { void load(); }, [load]));
@@ -99,6 +114,31 @@ export default function BiomarkersScreen() {
           <Text className="text-slate-300 text-xs leading-5">{panel.description}</Text>
           <Text className="text-slate-500 text-[10px] mt-1 italic">Cadence: {panel.cadence}</Text>
         </View>
+
+        {/* Recommended panel prompt for active-protocol categories */}
+        {recommendedCats.length > 0 && (
+          <View className="mb-4">
+            {recommendedCats.map((c) => {
+              if (c === category) return null;
+              const pRows = rows.filter((r) => PANELS[c].recommended.includes(r.biomarker_key));
+              if (pRows.length > 0) return null;
+              return (
+                <TouchableOpacity
+                  key={c}
+                  className="bg-amber-900/20 border border-amber-800 rounded-xl p-3 mb-2"
+                  onPress={() => setCategory(c)}
+                >
+                  <Text className="text-amber-300 text-xs font-bold mb-0.5">
+                    💡 Recommended: {PANELS[c].label}
+                  </Text>
+                  <Text className="text-amber-200/80 text-[11px] leading-4">
+                    You have active protocols in this category but no readings yet. Tap to switch.
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        )}
 
         {/* Entry form */}
         <View className="bg-surface-card rounded-2xl p-4 mb-4 border border-surface-border">
