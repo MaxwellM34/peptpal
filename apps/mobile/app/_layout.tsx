@@ -8,7 +8,9 @@ import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { isDbAvailable, getDb } from '../src/db/client';
+import { getTutorialState } from '../src/db/tutorial';
 import { DisclaimerModal } from './modals/disclaimer';
+import { useRouter } from 'expo-router';
 
 const isWeb = Platform.OS === 'web';
 
@@ -29,8 +31,10 @@ const queryClient = new QueryClient({
 const DISCLAIMER_KEY = 'disclaimer_acknowledged_v1';
 
 export default function RootLayout() {
+  const router = useRouter();
   const [ready, setReady] = useState(isWeb); // web skips init gate
   const [showDisclaimer, setShowDisclaimer] = useState(false);
+  const [needsTutorial, setNeedsTutorial] = useState(false);
 
   useEffect(() => {
     async function init() {
@@ -59,6 +63,11 @@ export default function RootLayout() {
         if (!ack) {
           setShowDisclaimer(true);
         }
+
+        if (isDbAvailable()) {
+          const t = await getTutorialState();
+          if (!t?.completed) setNeedsTutorial(true);
+        }
       } finally {
         setReady(true);
         if (!isWeb) {
@@ -68,6 +77,14 @@ export default function RootLayout() {
     }
     void init();
   }, []);
+
+  // Push to tutorial once ready, disclaimer ack'd, and tutorial not completed.
+  useEffect(() => {
+    if (ready && !showDisclaimer && needsTutorial) {
+      router.push('/tutorial');
+      setNeedsTutorial(false); // prevent re-triggering during session
+    }
+  }, [ready, showDisclaimer, needsTutorial, router]);
 
   async function handleDisclaimerAck() {
     if (isWeb) {
@@ -107,6 +124,10 @@ export default function RootLayout() {
               <Stack.Screen
                 name="modals/reconstitution-calc"
                 options={{ presentation: 'modal', title: 'Reconstitution Calculator' }}
+              />
+              <Stack.Screen
+                name="tutorial"
+                options={{ headerShown: false, presentation: 'fullScreenModal' }}
               />
             </Stack>
           </View>

@@ -12,6 +12,7 @@ import { Card, Button, TextInput } from '@peptpal/ui';
 import { exportAllData, importAllData } from '../../../src/db/backup';
 import { submitCommunityReport } from '../../../src/api/client';
 import { getUserProfile, upsertUserProfile } from '../../../src/db/profile';
+import { resetTutorial } from '../../../src/db/tutorial';
 import type { BackupPayload } from '../../../src/db/backup';
 import { lbsToKg, kgToLbs, PERSONAS, PERSONA_ORDER, type PersonaKey } from '@peptpal/core';
 
@@ -426,6 +427,23 @@ export default function SettingsScreen() {
               )}
             </>
           )}
+        </Card>
+
+        {/* Tutorial */}
+        <Card className="mb-4">
+          <Text className="text-white font-bold text-base mb-1">🎓 Tutorial</Text>
+          <Text className="text-slate-400 text-xs mb-3">
+            Replay the PeptPal onboarding walkthrough.
+          </Text>
+          <Button
+            variant="secondary"
+            onPress={async () => {
+              await resetTutorial();
+              router.push('/tutorial');
+            }}
+          >
+            Replay Tutorial
+          </Button>
         </Card>
 
         {/* Disclaimer */}
