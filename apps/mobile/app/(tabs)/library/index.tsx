@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, FlatList, TextInput, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { PeptideCard } from '@peptpal/ui';
 import { usePeptideList, usePeptideSearch } from '../../../src/hooks/usePeptides';
+import { getActiveProtocolItems } from '../../../src/db/protocols';
 
 type RouteFilter = 'all' | 'subq' | 'im' | 'intranasal' | 'topical';
 type StorageFilter = 'all' | 'fridge' | 'freezer';
@@ -13,6 +14,15 @@ export default function LibraryScreen() {
   const [query, setQuery] = useState('');
   const [routeFilter, setRouteFilter] = useState<RouteFilter>('all');
   const [storageFilter, setStorageFilter] = useState<StorageFilter>('all');
+  const [onProtocolSlugs, setOnProtocolSlugs] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    void getActiveProtocolItems().then((items) => {
+      const s = new Set<string>();
+      for (const i of items) if (i.peptide_slug) s.add(i.peptide_slug);
+      setOnProtocolSlugs(s);
+    });
+  }, []);
 
   const listQuery = usePeptideList();
   const searchQuery = usePeptideSearch(query);
@@ -22,11 +32,19 @@ export default function LibraryScreen() {
   const isLoading = isSearching ? searchQuery.isLoading : listQuery.isLoading;
   const isError = isSearching ? searchQuery.isError : listQuery.isError;
 
-  const filtered = (data ?? []).filter((p) => {
-    if (routeFilter !== 'all' && !p.routes.includes(routeFilter)) return false;
-    if (storageFilter !== 'all' && p.storage_temp !== storageFilter) return false;
-    return true;
-  });
+  const filtered = (data ?? [])
+    .filter((p) => {
+      if (routeFilter !== 'all' && !p.routes.includes(routeFilter)) return false;
+      if (storageFilter !== 'all' && p.storage_temp !== storageFilter) return false;
+      return true;
+    })
+    .sort((a, b) => {
+      // Active-protocol peptides float to the top.
+      const aOn = onProtocolSlugs.has(a.slug) ? 0 : 1;
+      const bOn = onProtocolSlugs.has(b.slug) ? 0 : 1;
+      if (aOn !== bOn) return aOn - bOn;
+      return a.name.localeCompare(b.name);
+    });
 
   return (
     <SafeAreaView className="flex-1 bg-surface" edges={['bottom']}>
