@@ -1,4 +1,4 @@
-import React, { useRef, useCallback } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, Platform } from 'react-native';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -27,7 +27,24 @@ const TAB_META: Record<
 
 export function TwoRowTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
-  const { registerHotspot, onHotspotTapped, active: tutorialActive } = useTutorial();
+  const { registerHotspot, onHotspotTapped, active: tutorialActive, stepIndex } = useTutorial();
+  // Keep refs per tab so we can re-measure whenever the tutorial activates
+  // or the current step changes (the spotlight may need a fresh measurement).
+  const tabRefs = useRef<Map<string, View | null>>(new Map());
+
+  useEffect(() => {
+    if (!tutorialActive) return;
+    // Re-measure every registered tab button against the window.
+    const id = setTimeout(() => {
+      tabRefs.current.forEach((node, hotspotId) => {
+        if (!node) return;
+        node.measureInWindow((wx, wy, ww, wh) => {
+          if (ww > 0) registerHotspot(hotspotId, { x: wx, y: wy, width: ww, height: wh });
+        });
+      });
+    }, 100);
+    return () => clearTimeout(id);
+  }, [tutorialActive, stepIndex, registerHotspot]);
 
   const visibleRoutes = state.routes.filter((r) => {
     const options = descriptors[r.key]?.options;
@@ -61,22 +78,21 @@ export function TwoRowTabBar({ state, descriptors, navigation }: BottomTabBarPro
                 key={route.key}
                 accessibilityRole="button"
                 accessibilityState={focused ? { selected: true } : {}}
-                onLayout={(e) => {
-                  if (meta.hotspotId && tutorialActive) {
-                    const { x, y, width, height } = e.nativeEvent.layout;
-                    // onLayout gives layout-local coords; measure window to be accurate.
-                    // Schedule a measureInWindow on the next tick.
-                    setTimeout(() => {
-                      const node = e.target as unknown as { measureInWindow?: (cb: (wx: number, wy: number, w: number, h: number) => void) => void };
-                      if (node?.measureInWindow) {
-                        node.measureInWindow((wx, wy, ww, wh) => {
-                          if (ww > 0) registerHotspot(meta.hotspotId!, { x: wx, y: wy, width: ww, height: wh });
-                        });
-                      } else {
-                        registerHotspot(meta.hotspotId!, { x, y, width, height });
-                      }
-                    }, 50);
+                ref={(node) => {
+                  if (meta.hotspotId) {
+                    // Store node ref for later re-measurement on tutorial activation.
+                    tabRefs.current.set(meta.hotspotId, node as unknown as View | null);
                   }
+                }}
+                onLayout={() => {
+                  if (!meta.hotspotId) return;
+                  const node = tabRefs.current.get(meta.hotspotId);
+                  // measureInWindow on the next frame — onLayout's coords are local.
+                  setTimeout(() => {
+                    node?.measureInWindow((wx, wy, ww, wh) => {
+                      if (ww > 0) registerHotspot(meta.hotspotId!, { x: wx, y: wy, width: ww, height: wh });
+                    });
+                  }, 30);
                 }}
                 onPress={() => {
                   if (meta.hotspotId) onHotspotTapped(meta.hotspotId);

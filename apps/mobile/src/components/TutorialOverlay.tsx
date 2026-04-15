@@ -62,23 +62,10 @@ export function TutorialOverlay() {
 
   const hotspot = currentStep.hotspotId ? hotspots.get(currentStep.hotspotId) : null;
 
-  // If hotspot is declared but not yet measured, wait (render a small hint).
-  if (currentStep.hotspotId && !hotspot) {
-    return (
-      <View style={[StyleSheet.absoluteFillObject, styles.waiting]}>
-        <Text style={styles.waitingText}>PeptPal is looking for the button…</Text>
-        <View style={{ flexDirection: 'row', marginTop: 16, gap: 8 }}>
-          <TouchableOpacity onPress={skip} style={styles.skipBtn}>
-            <Text style={styles.skipText}>Skip</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={next} style={styles.nextBtn}>
-            <Text style={styles.nextText}>Skip this step →</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  }
-
+  // If the step needs a hotspot we can't find (screen not mounted, layout not
+  // yet measured, etc), fall back to a centered mascot — don't block the
+  // whole screen. The user can still see the app through the dim layer and
+  // advance past the step.
   const spot = hotspot
     ? {
         x: Math.max(0, hotspot.x - PAD),
@@ -161,6 +148,11 @@ export function TutorialOverlay() {
               <Text style={{ color: '#f1f5f9', fontSize: 13, lineHeight: 18 }}>
                 {currentStep.message}
               </Text>
+              {currentStep.hotspotId && !hotspot && (
+                <Text style={{ color: '#94a3b8', fontSize: 11, marginTop: 6, fontStyle: 'italic' }}>
+                  (Can't find that control right now — hit Next to keep going.)
+                </Text>
+              )}
             </SpeechBubble>
           </View>
         </View>
@@ -207,16 +199,6 @@ function DimPanel({
 }
 
 const styles = StyleSheet.create({
-  waiting: {
-    backgroundColor: DIM,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 32,
-  },
-  waitingText: {
-    color: '#f1f5f9',
-    fontSize: 14,
-  },
   skipBtn: {
     paddingVertical: 10,
     paddingHorizontal: 14,

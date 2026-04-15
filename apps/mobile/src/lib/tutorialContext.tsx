@@ -66,13 +66,13 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     id: 'welcome',
     hotspotId: null,
     message:
-      "Sup. I'm PeptPal. I'm gonna show you around. I'll spotlight stuff — tap where I point, or hit Next to walk through. Skip anytime.",
+      "Sup. I'm PeptPal. I'll spotlight stuff as we go — tap the highlighted button, or hit Next to just walk through. Skip anytime.",
     advanceMode: 'next_button',
   },
   {
     id: 'open_settings',
     hotspotId: 'tab.settings',
-    message: 'Start with Settings. Tap here to set your weight — scaling doses to you matters more than the vendor\'s suggestion.',
+    message: "First stop: Settings. Tap the ⚙️ tab. If you're already there, hit Next.",
     advanceMode: 'tap_hotspot',
   },
   {
@@ -210,33 +210,48 @@ export function useTutorial(): TutorialContextValue {
 
 /**
  * Hook: attach to a real UI element to register it as a tutorial hotspot.
- * Returns a ref to attach to a <View> / <TouchableOpacity> and a callback
- * to fire when the element is pressed (so the tutorial can auto-advance).
+ *
+ * Registers on every layout change — never gated on tutorial-active. If the
+ * screen is mounted before the tutorial starts, its hotspots are still in the
+ * registry so the overlay can spotlight them the moment the tutorial opens.
+ *
+ * Re-measures whenever the tutorial activates or the step index changes, in
+ * case the UI shifted (keyboard, scroll, route transition).
  */
 export function useTutorialHotspot(id: string) {
   const ref = useRef<View>(null);
-  const { registerHotspot, unregisterHotspot, onHotspotTapped, active } = useTutorial();
+  const { registerHotspot, unregisterHotspot, onHotspotTapped, active, stepIndex } = useTutorial();
 
   const measure = useCallback(() => {
-    if (!ref.current) return;
-    ref.current.measureInWindow((x, y, width, height) => {
-      if (width > 0 && height > 0) {
-        registerHotspot(id, { x, y, width, height });
-      }
-    });
+    const node = ref.current;
+    if (!node) return;
+    // measureInWindow gives absolute coords across the screen, which is what
+    // the overlay needs. Schedule on next tick so onLayout's view tree is settled.
+    setTimeout(() => {
+      node.measureInWindow((x, y, width, height) => {
+        if (width > 0 && height > 0) {
+          registerHotspot(id, { x, y, width, height });
+        }
+      });
+    }, 30);
   }, [id, registerHotspot]);
 
+  // Re-measure when the tutorial opens or advances — layout can shift between
+  // steps (keyboard dismisses, navigation transitions).
   useEffect(() => {
     if (!active) return;
-    // Measure after layout; keep measuring periodically in case layout shifts.
-    const t1 = setTimeout(measure, 150);
-    const t2 = setTimeout(measure, 600);
+    const t1 = setTimeout(measure, 100);
+    const t2 = setTimeout(measure, 400);
     return () => {
       clearTimeout(t1);
       clearTimeout(t2);
-      unregisterHotspot(id);
     };
-  }, [active, id, measure, unregisterHotspot]);
+  }, [active, stepIndex, measure]);
+
+  // Cleanup only on unmount.
+  useEffect(() => {
+    return () => unregisterHotspot(id);
+  }, [id, unregisterHotspot]);
 
   const onPress = useCallback(() => {
     onHotspotTapped(id);
