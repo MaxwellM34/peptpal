@@ -3,8 +3,14 @@ import { View, Text, FlatList, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { format } from 'date-fns';
-import { Badge } from '@peptpal/ui';
-import { estimateRemainingDoses } from '@peptpal/core';
+import { Badge, DegradationChart } from '@peptpal/ui';
+import {
+  estimateRemainingDoses,
+  remainingPotency,
+  storageStateFromVial,
+  buildDegradationCurve,
+  doseCompensationMultiplier,
+} from '@peptpal/core';
 import { getInventoryItems, softDeleteInventoryItem } from '../../../src/db/inventory';
 import type { InventoryItem } from '@peptpal/core';
 
@@ -106,31 +112,13 @@ export default function InventoryScreen() {
                 <Badge variant={statusBadgeVariant[status]}>{status}</Badge>
               </View>
 
-              {item.reconstituted && daysLeft != null && status !== 'Expired' && (
-                <View className="mt-3">
-                  <View className="flex-row justify-between mb-1">
-                    <Text className="text-slate-500 text-[10px] uppercase font-semibold">
-                      Reconstituted Stability
-                    </Text>
-                    <Text className={`text-[10px] font-bold ${
-                      status === 'Degraded' ? 'text-red-400' :
-                      status === 'Aging' ? 'text-amber-400' : 'text-emerald-400'
-                    }`}>
-                      {status === 'Degraded' ? 'Past stability' : `${daysLeft}d left`}
-                    </Text>
-                  </View>
-                  <View className="h-1 bg-surface-elevated rounded-full overflow-hidden">
-                    <View
-                      className={`h-1 rounded-full ${
-                        status === 'Degraded' ? 'bg-red-500' :
-                        status === 'Aging' ? 'bg-amber-500' : 'bg-emerald-500'
-                      }`}
-                      style={{
-                        width: `${Math.min(100, ((daysRecon ?? 0) / RECON_STABILITY_DAYS) * 100)}%`,
-                      }}
-                    />
-                  </View>
-                </View>
+              {item.reconstituted && daysRecon != null && status !== 'Expired' && (
+                <DegradationBlock
+                  peptideSlug={slugifyName(item.peptide_name)}
+                  reconstituted={item.reconstituted}
+                  storage_location={item.storage_location}
+                  daysRecon={daysRecon}
+                />
               )}
 
               <View className="mt-3 flex-row flex-wrap gap-3">
@@ -157,6 +145,85 @@ export default function InventoryScreen() {
         }
       />
     </SafeAreaView>
+  );
+}
+
+function slugifyName(name: string): string {
+  return name.toLowerCase().replace(/\s*\(.*?\)\s*/g, '').trim().replace(/[^a-z0-9]+/g, '-');
+}
+
+function DegradationBlock({
+  peptideSlug,
+  reconstituted,
+  storage_location,
+  daysRecon,
+}: {
+  peptideSlug: string;
+  reconstituted: boolean;
+  storage_location: string;
+  daysRecon: number;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const state = storageStateFromVial({ reconstituted, storage_location });
+  const potency = remainingPotency(peptideSlug, state, daysRecon);
+  const pct = Math.round(potency * 100);
+  const mult = doseCompensationMultiplier(potency);
+
+  let tone: 'emerald' | 'amber' | 'red' = 'emerald';
+  if (potency < 0.6) tone = 'red';
+  else if (potency < 0.8) tone = 'amber';
+
+  return (
+    <View className="mt-3">
+      <TouchableOpacity onPress={() => setExpanded(!expanded)} activeOpacity={0.8}>
+        <View className="flex-row justify-between mb-1">
+          <Text className="text-slate-500 text-[10px] uppercase font-semibold">
+            Est. potency (tap for chart)
+          </Text>
+          <Text className={`text-[10px] font-bold ${
+            tone === 'red' ? 'text-red-400' : tone === 'amber' ? 'text-amber-400' : 'text-emerald-400'
+          }`}>
+            {pct}% · ~day {Math.floor(daysRecon)}
+          </Text>
+        </View>
+        <View className="h-1.5 bg-surface-elevated rounded-full overflow-hidden">
+          <View
+            className={`h-1.5 rounded-full ${
+              tone === 'red' ? 'bg-red-500' : tone === 'amber' ? 'bg-amber-500' : 'bg-emerald-500'
+            }`}
+            style={{ width: `${pct}%` }}
+          />
+        </View>
+      </TouchableOpacity>
+
+      {expanded && (
+        <View className="mt-3 bg-surface-elevated rounded-xl p-3 border border-surface-border">
+          <DegradationChart
+            points={buildDegradationCurve(peptideSlug, state, Date.now() - daysRecon * 86_400_000, 45, 45)}
+            currentPotency={potency}
+            daysInState={daysRecon}
+            totalDays={45}
+            width={280}
+            height={150}
+          />
+          {tone !== 'emerald' && (
+            <View className={`${tone === 'red' ? 'bg-red-900/30 border-red-800' : 'bg-amber-900/30 border-amber-800'} border rounded-lg p-2 mt-2`}>
+              <Text className={`${tone === 'red' ? 'text-red-300' : 'text-amber-300'} text-xs font-semibold mb-1`}>
+                Dose compensation estimate
+              </Text>
+              <Text className="text-slate-300 text-[11px] leading-5">
+                To match original potency, multiply dose by {mult.toFixed(2)}×.
+                E.g., a 250 mcg target → ~{Math.round(250 * mult)} mcg.
+              </Text>
+              <Text className="text-slate-500 text-[10px] mt-1 italic">
+                Estimate only. Supplier purity variance + injection absorption variance
+                likely exceed this correction. Prefer using a fresher vial when possible.
+              </Text>
+            </View>
+          )}
+        </View>
+      )}
+    </View>
   );
 }
 

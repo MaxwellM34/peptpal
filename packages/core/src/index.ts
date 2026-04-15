@@ -14,4 +14,5 @@ export * from './protocolSeeds';
 export * from './personas';
 export * from './externalProtocols';
 export * from './externalProtocolData';
+export * from './degradation';
 export * from './types';

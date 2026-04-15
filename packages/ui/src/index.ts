@@ -17,3 +17,5 @@ export { SyringeDiagram } from './SyringeDiagram';
 export type { SyringeDiagramProps } from './SyringeDiagram';
 export { DoseScalingCard } from './DoseScalingCard';
 export type { DoseScalingCardProps } from './DoseScalingCard';
+export { DegradationChart } from './DegradationChart';
+export type { DegradationChartProps } from './DegradationChart';
