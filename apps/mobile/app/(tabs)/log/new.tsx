@@ -12,7 +12,12 @@ import {
   remainingPotency,
   storageStateFromVial,
   doseCompensationMultiplier,
+  PROTOCOL_SEEDS,
+  scaleDose,
 } from '@peptpal/core';
+import { getUserProfile } from '../../../src/db/profile';
+import { getActiveProtocolItems, type ProtocolItemRow } from '../../../src/db/protocols';
+import { getSiteRotationStatus, type SiteLastUsed } from '../../../src/db/injectionLog';
 import type { InjectionSite } from '@peptpal/core';
 import { usePeptideList } from '../../../src/hooks/usePeptides';
 import { createInjectionLog } from '../../../src/db/injectionLog';
@@ -40,6 +45,9 @@ export default function NewInjectionScreen() {
   const [suggestedVial, setSuggestedVial] = useState<InventoryItem | null>(null);
   const [sealedVials, setSealedVials] = useState<InventoryItem[]>([]);
   const [stabilityOverride, setStabilityOverride] = useState(false);
+  const [weightKg, setWeightKg] = useState<number | null>(null);
+  const [activeProtocolItem, setActiveProtocolItem] = useState<ProtocolItemRow | null>(null);
+  const [siteStatuses, setSiteStatuses] = useState<SiteLastUsed[]>([]);
   const [aeNausea, setAeNausea] = useState(0);
   const [aeFatigue, setAeFatigue] = useState(0);
   const [aeSite, setAeSite] = useState(0);
@@ -53,7 +61,25 @@ export default function NewInjectionScreen() {
     getInventoryItems().then((items) => {
       setInventoryItems(items.filter((i) => i.reconstituted));
     });
+    getUserProfile().then((p) => setWeightKg(p?.weight_kg ?? null));
+    getSiteRotationStatus().then(setSiteStatuses);
   }, []);
+
+  // When peptide changes, look up active protocol item for this peptide.
+  useEffect(() => {
+    if (!peptideRefId) {
+      setActiveProtocolItem(null);
+      return;
+    }
+    void (async () => {
+      const items = await getActiveProtocolItems();
+      const match = items.find((i) => i.peptide_ref_id === peptideRefId);
+      setActiveProtocolItem(match ?? null);
+      // Pre-fill dose from protocol if user hasn't typed yet.
+      if (match && !doseMcg) setDoseMcg(String(match.dose_mcg));
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [peptideRefId]);
 
   // When peptide is selected, find oldest reconstituted vial (FIFO) and sealed vials.
   useEffect(() => {
@@ -194,7 +220,22 @@ export default function NewInjectionScreen() {
                   = {doseMl} mL at {selectedInventory?.concentration_mcg_per_ml} mcg/mL
                 </Text>
               )}
+
+              <DoseFeedback
+                doseMcg={parseFloat(doseMcg)}
+                peptideName={peptideName}
+                weightKg={weightKg}
+                protocolDoseMcg={activeProtocolItem?.dose_mcg ?? null}
+              />
             </View>
+
+            {/* Site rotation suggestion */}
+            {peptideRefId != null && siteStatuses.length > 0 && !site && (
+              <SiteSuggestion
+                sites={siteStatuses}
+                onPick={(s) => setSite(s as InjectionSite)}
+              />
+            )}
 
             {/* Inventory picker */}
             {inventoryItems.length > 0 && (
@@ -291,6 +332,129 @@ export default function NewInjectionScreen() {
         />
       )}
     </>
+  );
+}
+
+function DoseFeedback({
+  doseMcg,
+  peptideName,
+  weightKg,
+  protocolDoseMcg,
+}: {
+  doseMcg: number;
+  peptideName: string;
+  weightKg: number | null;
+  protocolDoseMcg: number | null;
+}) {
+  if (!doseMcg || !isFinite(doseMcg) || doseMcg <= 0) return null;
+
+  const slug = peptideName
+    ? peptideName.toLowerCase().replace(/\s*\(.*?\)\s*/g, '').trim().replace(/[^a-z0-9]+/g, '-')
+    : '';
+  const seed = slug ? PROTOCOL_SEEDS[slug] : undefined;
+
+  let lines: Array<{ text: string; tone: 'muted' | 'amber' | 'red' | 'emerald' | 'primary' }> = [];
+
+  if (protocolDoseMcg) {
+    const ratio = doseMcg / protocolDoseMcg;
+    if (Math.abs(ratio - 1) < 0.05) {
+      lines.push({ text: `At your active protocol's target dose (${protocolDoseMcg} mcg).`, tone: 'emerald' });
+    } else {
+      lines.push({
+        text: `${ratio.toFixed(2)}× your active protocol dose (${protocolDoseMcg} mcg).`,
+        tone: ratio > 1.25 || ratio < 0.75 ? 'amber' : 'muted',
+      });
+    }
+  }
+
+  if (seed && weightKg != null) {
+    const scaled = scaleDose(seed.startingDose, { weightKg });
+    const ratioToScaled = doseMcg / scaled.scaledDoseMcg;
+    if (ratioToScaled > 1.4) {
+      lines.push({
+        text: `⛔ ${ratioToScaled.toFixed(2)}× your weight-scaled starting dose — in the trial AE signal zone.`,
+        tone: 'red',
+      });
+    } else if (ratioToScaled > 1.2) {
+      lines.push({
+        text: `⚠ ${ratioToScaled.toFixed(2)}× your weight-scaled starting dose.`,
+        tone: 'amber',
+      });
+    } else if (ratioToScaled < 0.5) {
+      lines.push({
+        text: `ℹ Subtherapeutic (${ratioToScaled.toFixed(2)}× scaled starting dose).`,
+        tone: 'primary',
+      });
+    }
+  }
+
+  if (seed && doseMcg > seed.hardCeilingMcg) {
+    lines.push({
+      text: `⛔ Above the ${seed.hardCeilingMcg} mcg hard ceiling for ${peptideName}.`,
+      tone: 'red',
+    });
+  }
+
+  if (lines.length === 0) return null;
+
+  const toneColors = {
+    muted: '#94a3b8',
+    amber: '#fbbf24',
+    red: '#f87171',
+    emerald: '#34d399',
+    primary: '#60a5fa',
+  } as const;
+
+  return (
+    <View className="mt-2 gap-1">
+      {lines.map((l, i) => (
+        <Text key={i} style={{ fontSize: 11, lineHeight: 16, color: toneColors[l.tone] }}>
+          {l.text}
+        </Text>
+      ))}
+    </View>
+  );
+}
+
+const SITE_LABELS: Record<string, string> = {
+  abdomen_left: 'Abdomen L',
+  abdomen_right: 'Abdomen R',
+  thigh_left: 'Thigh L',
+  thigh_right: 'Thigh R',
+  deltoid_left: 'Deltoid L',
+  deltoid_right: 'Deltoid R',
+  glute_left: 'Glute L',
+  glute_right: 'Glute R',
+};
+
+function SiteSuggestion({
+  sites,
+  onPick,
+}: {
+  sites: SiteLastUsed[];
+  onPick: (site: string) => void;
+}) {
+  // Sort by most-rested (highest daysSince).
+  const sorted = [...sites].sort((a, b) => b.daysSince - a.daysSince);
+  const best = sorted[0];
+  if (!best) return null;
+  return (
+    <View className="bg-emerald-900/15 border border-emerald-800 rounded-xl p-3 mb-4">
+      <Text className="text-emerald-300 text-xs font-semibold mb-1">
+        Suggested site: {SITE_LABELS[best.site] ?? best.site}
+      </Text>
+      <Text className="text-slate-300 text-xs leading-5 mb-2">
+        Rested longest ({Math.floor(best.daysSince)} days). Rotate to avoid lipohypertrophy.
+      </Text>
+      <TouchableOpacity
+        className="py-2 rounded-lg bg-emerald-700/40 items-center"
+        onPress={() => onPick(best.site)}
+      >
+        <Text className="text-emerald-200 text-xs font-semibold">
+          Use {SITE_LABELS[best.site] ?? best.site}
+        </Text>
+      </TouchableOpacity>
+    </View>
   );
 }
 
