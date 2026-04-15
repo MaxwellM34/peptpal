@@ -1,14 +1,17 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Platform, View, Text, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { format } from 'date-fns';
-import { Card, Badge } from '@peptpal/ui';
+import { Badge } from '@peptpal/ui';
 import { isDbAvailable } from '../../src/db/client';
 import { getInjectionLogs } from '../../src/db/injectionLog';
 import { getSymptomLogs } from '../../src/db/symptomLog';
 import { getSchedules } from '../../src/db/schedules';
 import { getInventoryItems } from '../../src/db/inventory';
+import { computeDashboardAlerts, type DashboardAlert } from '../../src/lib/dashboardAlerts';
+import { predictNextDose, formatTimeUntil, type NextDose } from '../../src/lib/nextDose';
+import { listProtocols, getProtocolItems, type ProtocolRow, type ProtocolItemRow } from '../../src/db/protocols';
 import type { InjectionLog, SymptomLog, Schedule, InventoryItem } from '@peptpal/core';
 
 export default function DashboardScreen() {
@@ -17,20 +20,53 @@ export default function DashboardScreen() {
   const [recentSymptoms, setRecentSymptoms] = useState<SymptomLog[]>([]);
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
+  const [alerts, setAlerts] = useState<DashboardAlert[]>([]);
+  const [nextDose, setNextDose] = useState<NextDose | null>(null);
+  const [activeProtocols, setActiveProtocols] = useState<Array<ProtocolRow & { items: ProtocolItemRow[] }>>([]);
+  const [weekStats, setWeekStats] = useState({ injections: 0, peptides: 0, totalMcg: 0 });
+  const [streak, setStreak] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
     if (!isDbAvailable()) return;
-    const [logs, symptoms, scheds, inv] = await Promise.all([
+    const weekAgo = new Date(Date.now() - 7 * 86_400_000).toISOString();
+    const [logs, symptoms, scheds, inv, alertsData, nd, weekLogs, protocolsList] = await Promise.all([
       getInjectionLogs({ limit: 3 }),
       getSymptomLogs({ limit: 3 }),
       getSchedules(),
       getInventoryItems(),
+      computeDashboardAlerts(),
+      predictNextDose(),
+      getInjectionLogs({ since: weekAgo, limit: 500 }),
+      listProtocols(true),
     ]);
     setRecentLogs(logs);
     setRecentSymptoms(symptoms);
     setSchedules(scheds.filter((s) => !s.deleted_at));
     setInventory(inv);
+    setAlerts(alertsData);
+    setNextDose(nd);
+    setWeekStats({
+      injections: weekLogs.length,
+      peptides: new Set(weekLogs.map((l) => l.peptide_name)).size,
+      totalMcg: weekLogs.reduce((s, l) => s + l.dose_mcg, 0),
+    });
+    // Streak: consecutive days ending today with at least one injection.
+    const daysWithLogs = new Set(
+      weekLogs.map((l) => new Date(l.injected_at).toISOString().slice(0, 10)),
+    );
+    let s = 0;
+    for (let i = 0; i < 30; i++) {
+      const day = new Date(Date.now() - i * 86_400_000).toISOString().slice(0, 10);
+      if (daysWithLogs.has(day)) s++;
+      else if (i === 0) continue; // allow today to not yet have an injection
+      else break;
+    }
+    setStreak(s);
+    const withItems = await Promise.all(
+      protocolsList.map(async (p) => ({ ...p, items: await getProtocolItems(p.id) })),
+    );
+    setActiveProtocols(withItems);
   }, []);
 
   useEffect(() => { void load(); }, [load]);
@@ -62,6 +98,80 @@ export default function DashboardScreen() {
           <QuickAction emoji="🔔" label="Log Symptom" onPress={() => router.push('/(tabs)/symptoms/new')} />
           <QuickAction emoji="🧮" label="Calculator" onPress={() => router.push('/modals/reconstitution-calc')} />
         </View>
+
+        {/* Week-at-a-glance stats */}
+        <View className="flex-row gap-2 mb-4">
+          <StatTile label="7-day injections" value={String(weekStats.injections)} tone="primary" />
+          <StatTile label="peptides" value={String(weekStats.peptides)} tone="default" />
+          <StatTile
+            label="streak (d)"
+            value={String(streak)}
+            tone={streak >= 3 ? 'emerald' : 'default'}
+          />
+        </View>
+
+        {/* Active protocols summary */}
+        {activeProtocols.length > 0 && (
+          <TouchableOpacity
+            className="bg-surface-card rounded-2xl p-3 mb-4 border border-surface-border"
+            onPress={() => router.push('/(tabs)/schedule/protocols')}
+            activeOpacity={0.85}
+          >
+            <View className="flex-row justify-between items-center mb-1">
+              <Text className="text-slate-400 text-[10px] uppercase font-semibold">Active Protocols</Text>
+              <Text className="text-primary-400 text-xs">Manage →</Text>
+            </View>
+            {activeProtocols.slice(0, 3).map((p) => (
+              <View key={p.id} className="flex-row items-center justify-between py-1">
+                <Text className="text-white font-semibold text-sm">{p.name}</Text>
+                <Text className="text-slate-400 text-xs">{p.items.length} peptide{p.items.length === 1 ? '' : 's'}</Text>
+              </View>
+            ))}
+            {activeProtocols.length > 3 && (
+              <Text className="text-slate-500 text-xs mt-1">+ {activeProtocols.length - 3} more</Text>
+            )}
+          </TouchableOpacity>
+        )}
+
+        {/* Alerts */}
+        {alerts.length > 0 && (
+          <View className="mb-4">
+            {alerts.slice(0, 4).map((a, i) => (
+              <AlertCard key={i} alert={a} onPress={() => a.route && router.push(a.route as never)} />
+            ))}
+            {alerts.length > 4 && (
+              <Text className="text-slate-500 text-xs mt-1 px-1">
+                + {alerts.length - 4} more alert{alerts.length - 4 === 1 ? '' : 's'}
+              </Text>
+            )}
+          </View>
+        )}
+
+        {/* Next dose from active protocol */}
+        {nextDose && (
+          <TouchableOpacity
+            className={`rounded-2xl p-4 mb-4 border ${
+              nextDose.overdue
+                ? 'bg-amber-900/20 border-amber-800'
+                : 'bg-primary-900/20 border-primary-800'
+            }`}
+            onPress={() => router.push('/(tabs)/log/new')}
+            activeOpacity={0.85}
+          >
+            <Text className={`text-[10px] uppercase font-semibold ${
+              nextDose.overdue ? 'text-amber-300' : 'text-primary-300'
+            }`}>
+              {nextDose.overdue ? 'Overdue' : 'Next Dose'}
+            </Text>
+            <Text className="text-white font-bold text-base mt-1">
+              {nextDose.peptideName} · {nextDose.doseMcg} mcg
+            </Text>
+            <Text className="text-slate-400 text-xs mt-0.5">
+              From "{nextDose.protocolName}" · {formatTimeUntil(nextDose.dueAt)}
+              {!nextDose.overdue ? ' from now' : ''}
+            </Text>
+          </TouchableOpacity>
+        )}
 
         {/* Upcoming Schedules */}
         {schedules.length > 0 && (
@@ -179,5 +289,49 @@ function EmptyState({ message }: { message: string }) {
     <View className="bg-surface-card rounded-xl px-4 py-6 items-center">
       <Text className="text-slate-500 text-sm">{message}</Text>
     </View>
+  );
+}
+
+function StatTile({
+  label,
+  value,
+  tone = 'default',
+}: {
+  label: string;
+  value: string;
+  tone?: 'default' | 'primary' | 'emerald';
+}) {
+  const tones = {
+    default: { bg: 'bg-surface-card', border: 'border-surface-border', text: 'text-white' },
+    primary: { bg: 'bg-primary-900/20', border: 'border-primary-800', text: 'text-primary-300' },
+    emerald: { bg: 'bg-emerald-900/20', border: 'border-emerald-800', text: 'text-emerald-300' },
+  } as const;
+  const t = tones[tone];
+  return (
+    <View className={`flex-1 ${t.bg} border ${t.border} rounded-xl p-3`}>
+      <Text className="text-slate-500 text-[10px] uppercase font-semibold">{label}</Text>
+      <Text className={`${t.text} font-bold text-lg mt-0.5`}>{value}</Text>
+    </View>
+  );
+}
+
+function AlertCard({ alert, onPress }: { alert: DashboardAlert; onPress: () => void }) {
+  const tone = alert.severity === 'danger'
+    ? { bg: 'bg-red-900/25', border: 'border-red-800', text: 'text-red-300', icon: '⛔' }
+    : { bg: 'bg-amber-900/20', border: 'border-amber-800', text: 'text-amber-300', icon: '⚠' };
+  return (
+    <TouchableOpacity
+      className={`${tone.bg} ${tone.border} border rounded-xl px-3 py-2 mb-2 active:opacity-80`}
+      onPress={onPress}
+      activeOpacity={0.85}
+    >
+      <View className="flex-row items-start gap-2">
+        <Text style={{ fontSize: 14 }}>{tone.icon}</Text>
+        <View className="flex-1">
+          <Text className={`${tone.text} font-semibold text-xs`}>{alert.title}</Text>
+          <Text className="text-slate-300 text-[11px] leading-4 mt-0.5">{alert.body}</Text>
+        </View>
+      </View>
+    </TouchableOpacity>
   );
 }
