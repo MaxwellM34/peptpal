@@ -10,6 +10,8 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as Crypto from 'expo-crypto';
 import { Card, Button, TextInput } from '@peptpal/ui';
 import { exportAllData, importAllData } from '../../../src/db/backup';
+import { getInjectionLogs } from '../../../src/db/injectionLog';
+import { getInventoryItems } from '../../../src/db/inventory';
 import { submitCommunityReport } from '../../../src/api/client';
 import { getUserProfile, upsertUserProfile } from '../../../src/db/profile';
 import { resetTutorial } from '../../../src/db/tutorial';
@@ -464,6 +466,139 @@ export default function SettingsScreen() {
           >
             Replay Tutorial
           </Button>
+        </Card>
+
+        {/* CSV export */}
+        <Card className="mb-4">
+          <Text className="text-white font-bold text-base mb-1">📊 Export CSV</Text>
+          <Text className="text-slate-400 text-xs mb-3">
+            Plain-text export of your injection log and inventory for spreadsheets or sharing with a provider.
+          </Text>
+          <View className="flex-row gap-2">
+            <View className="flex-1">
+              <Button
+                variant="secondary"
+                onPress={async () => {
+                  const logs = await getInjectionLogs({ limit: 5000 });
+                  const header = 'date,peptide,dose_mcg,dose_ml,site,notes\n';
+                  const rows = logs
+                    .map((l) =>
+                      [
+                        l.injected_at,
+                        l.peptide_name,
+                        l.dose_mcg,
+                        l.dose_ml ?? '',
+                        l.injection_site ?? '',
+                        (l.notes ?? '').replace(/[\r\n,]/g, ' '),
+                      ].join(','),
+                    )
+                    .join('\n');
+                  const path = `${FileSystem.documentDirectory}peptpal-injections-${new Date().toISOString().slice(0, 10)}.csv`;
+                  await FileSystem.writeAsStringAsync(path, header + rows);
+                  const canShare = await Sharing.isAvailableAsync();
+                  if (canShare) await Sharing.shareAsync(path, { mimeType: 'text/csv' });
+                  else Alert.alert('CSV saved', `Saved to: ${path}`);
+                }}
+              >
+                Injections CSV
+              </Button>
+            </View>
+            <View className="flex-1">
+              <Button
+                variant="secondary"
+                onPress={async () => {
+                  const items = await getInventoryItems();
+                  const header = 'peptide,label,vial_mg,reconstituted,conc_mcg_ml,opened_at,vendor,batch,storage\n';
+                  const rows = items
+                    .map((i) => {
+                      const ii = i as typeof i & {
+                        label_number?: number | null;
+                        vendor?: string | null;
+                        batch_number?: string | null;
+                      };
+                      return [
+                        i.peptide_name,
+                        ii.label_number ?? '',
+                        i.vial_size_mg,
+                        i.reconstituted ? 'yes' : 'no',
+                        i.concentration_mcg_per_ml ?? '',
+                        i.opened_at ?? '',
+                        ii.vendor ?? '',
+                        ii.batch_number ?? '',
+                        i.storage_location,
+                      ].join(',');
+                    })
+                    .join('\n');
+                  const path = `${FileSystem.documentDirectory}peptpal-inventory-${new Date().toISOString().slice(0, 10)}.csv`;
+                  await FileSystem.writeAsStringAsync(path, header + rows);
+                  const canShare = await Sharing.isAvailableAsync();
+                  if (canShare) await Sharing.shareAsync(path, { mimeType: 'text/csv' });
+                  else Alert.alert('CSV saved', `Saved to: ${path}`);
+                }}
+              >
+                Inventory CSV
+              </Button>
+            </View>
+          </View>
+        </Card>
+
+        {/* Delete all data */}
+        <Card className="mb-4">
+          <Text className="text-white font-bold text-base mb-1">⚠ Danger Zone</Text>
+          <Text className="text-slate-400 text-xs mb-3">
+            Wipes every log, schedule, inventory item, protocol, biomarker reading, and profile from this device.
+            Reference peptide data (downloaded from the API) is untouched. Cannot be undone.
+          </Text>
+          <Button
+            variant="secondary"
+            onPress={() => {
+              Alert.alert(
+                'Delete all local data?',
+                'Type CANCEL at any prompt to stop. This wipes every log, inventory item, protocol, biomarker, and profile on this device.',
+                [
+                  { text: 'Cancel', style: 'cancel' },
+                  {
+                    text: 'Yes, wipe it',
+                    style: 'destructive',
+                    onPress: async () => {
+                      try {
+                        const { getDb } = await import('../../../src/db/client');
+                        const db = await getDb();
+                        await db.execAsync(
+                          "DELETE FROM peptides_log;\n" +
+                          "DELETE FROM symptoms_log;\n" +
+                          "DELETE FROM schedules;\n" +
+                          "DELETE FROM inventory;\n" +
+                          "DELETE FROM batches;\n" +
+                          "DELETE FROM biomarker_readings;\n" +
+                          "DELETE FROM protocol_items;\n" +
+                          "DELETE FROM protocols;\n" +
+                          "DELETE FROM user_profile;\n" +
+                          "DELETE FROM tutorial_state;\n" +
+                          "DELETE FROM reminders;"
+                        );
+                        Alert.alert('Done', 'All local data erased.');
+                      } catch (e) {
+                        Alert.alert('Error', String(e));
+                      }
+                    },
+                  },
+                ],
+              );
+            }}
+          >
+            Delete ALL Local Data
+          </Button>
+        </Card>
+
+        {/* About */}
+        <Card className="mb-4">
+          <Text className="text-white font-bold text-base mb-1">About</Text>
+          <Text className="text-slate-400 text-xs leading-5">
+            PeptPal · harm-reduction for peptide users · built in the open.{'\n'}
+            Evidence engine, consensus math, degradation model — all open source.{'\n'}
+            Report bugs or suggest features via the repository.
+          </Text>
         </Card>
 
         {/* Disclaimer */}

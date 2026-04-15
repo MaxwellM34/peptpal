@@ -175,6 +175,9 @@ export function TutorialProvider({ children }: { children: React.ReactNode }) {
       if (!active) return;
       const step = TUTORIAL_STEPS[stepIndex];
       if (step?.hotspotId === id && step.advanceMode === 'tap_hotspot') {
+        // Light haptic on tutorial advance — imported lazily to avoid
+        // a hard dependency in this pure context file.
+        void import('./haptics').then((m) => m.hapticTap()).catch(() => undefined);
         next();
       }
     },

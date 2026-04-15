@@ -8,6 +8,7 @@ import {
   getProtocolItems,
   setProtocolActive,
   softDeleteProtocol,
+  duplicateProtocol,
   type ProtocolRow,
   type ProtocolItemRow,
 } from '../../../src/db/protocols';
@@ -109,6 +110,15 @@ export default function ProtocolsScreen() {
             </View>
 
             <View className="flex-row gap-2 mt-3 pt-3 border-t border-surface-border">
+              <TouchableOpacity
+                className="py-1.5 px-3 border border-surface-border rounded-lg"
+                onPress={async () => {
+                  await duplicateProtocol(p.id);
+                  await load();
+                }}
+              >
+                <Text className="text-slate-300 text-xs">Duplicate</Text>
+              </TouchableOpacity>
               <TouchableOpacity
                 className="py-1.5 px-3 border border-danger-800 rounded-lg"
                 onPress={() => handleDelete(p.id)}

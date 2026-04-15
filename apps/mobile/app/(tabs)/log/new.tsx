@@ -18,6 +18,7 @@ import {
 import { getUserProfile } from '../../../src/db/profile';
 import { getActiveProtocolItems, type ProtocolItemRow } from '../../../src/db/protocols';
 import { getSiteRotationStatus, type SiteLastUsed } from '../../../src/db/injectionLog';
+import { hapticSuccess, hapticTap } from '../../../src/lib/haptics';
 import type { InjectionSite } from '@peptpal/core';
 import { usePeptideList } from '../../../src/hooks/usePeptides';
 import { createInjectionLog } from '../../../src/db/injectionLog';
@@ -151,6 +152,7 @@ export default function NewInjectionScreen() {
       if (inventoryId) {
         await decrementVialCount(inventoryId);
       }
+      void hapticSuccess();
       router.back();
     } finally {
       setSaving(false);

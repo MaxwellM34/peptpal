@@ -1,5 +1,5 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { View, Text, FlatList, TouchableOpacity } from 'react-native';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import { View, Text, FlatList, TouchableOpacity, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { format } from 'date-fns';
@@ -11,9 +11,21 @@ import type { InjectionLog } from '@peptpal/core';
 export default function LogHistoryScreen() {
   const router = useRouter();
   const [logs, setLogs] = useState<InjectionLog[]>([]);
+  const [peptideFilter, setPeptideFilter] = useState<string | null>(null);
   const levelsHotspot = useTutorialHotspot('log.levels_button');
   const listRef = useRef<FlatList<InjectionLog>>(null);
   useTutorialScrollReset(listRef);
+
+  const peptideOptions = useMemo(() => {
+    const names = new Set<string>();
+    for (const l of logs) names.add(l.peptide_name);
+    return Array.from(names).sort();
+  }, [logs]);
+
+  const visible = useMemo(() => {
+    if (!peptideFilter) return logs;
+    return logs.filter((l) => l.peptide_name === peptideFilter);
+  }, [logs, peptideFilter]);
 
   const load = useCallback(async () => {
     const data = await getInjectionLogs();
@@ -31,10 +43,11 @@ export default function LogHistoryScreen() {
     <SafeAreaView className="flex-1 bg-surface" edges={['bottom']}>
       <FlatList
         ref={listRef}
-        data={logs}
+        data={visible}
         keyExtractor={(item) => String(item.id)}
         contentContainerStyle={{ padding: 16 }}
         ListHeaderComponent={
+          <View>
           <View className="flex-row gap-2 mb-4">
             <TouchableOpacity
               className="flex-1 bg-primary-600 rounded-xl py-3 items-center active:bg-primary-700"
@@ -59,6 +72,40 @@ export default function LogHistoryScreen() {
             >
               <Text className="text-slate-200 font-semibold">🎯 Sites</Text>
             </TouchableOpacity>
+          </View>
+          {peptideOptions.length > 1 && (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-3">
+              <View className="flex-row gap-2">
+                <TouchableOpacity
+                  className={`px-3 py-1 rounded-full border ${
+                    peptideFilter === null
+                      ? 'bg-primary-600 border-primary-500'
+                      : 'bg-surface-elevated border-surface-border'
+                  }`}
+                  onPress={() => setPeptideFilter(null)}
+                >
+                  <Text className={`text-[11px] font-medium ${peptideFilter === null ? 'text-white' : 'text-slate-300'}`}>
+                    All
+                  </Text>
+                </TouchableOpacity>
+                {peptideOptions.map((n) => (
+                  <TouchableOpacity
+                    key={n}
+                    className={`px-3 py-1 rounded-full border ${
+                      peptideFilter === n
+                        ? 'bg-primary-600 border-primary-500'
+                        : 'bg-surface-elevated border-surface-border'
+                    }`}
+                    onPress={() => setPeptideFilter(n)}
+                  >
+                    <Text className={`text-[11px] font-medium ${peptideFilter === n ? 'text-white' : 'text-slate-300'}`}>
+                      {n}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </ScrollView>
+          )}
           </View>
         }
         renderItem={({ item }) => <LogItem log={item} onDelete={() => handleDelete(item.id)} />}

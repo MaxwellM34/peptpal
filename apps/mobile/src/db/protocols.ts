@@ -92,6 +92,31 @@ export async function setProtocolActive(id: number, active: boolean): Promise<vo
   await db.runAsync(`UPDATE protocols SET active = ? WHERE id = ?`, [active ? 1 : 0, id]);
 }
 
+export async function duplicateProtocol(id: number): Promise<number> {
+  if (!isDbAvailable()) return 0;
+  const db = await getDb();
+  const orig = await db.getFirstAsync<Omit<ProtocolRow, 'active'> & { active: number }>(
+    `SELECT * FROM protocols WHERE id = ? AND deleted_at IS NULL`,
+    [id],
+  );
+  if (!orig) return 0;
+  const items = await getProtocolItems(id);
+  return createProtocol({
+    name: `${orig.name} (copy)`,
+    goal: orig.goal,
+    active: false, // duplicates start inactive so user can edit first
+    items: items.map((i) => ({
+      peptide_ref_id: i.peptide_ref_id,
+      peptide_name: i.peptide_name,
+      peptide_slug: i.peptide_slug,
+      dose_mcg: i.dose_mcg,
+      doses_per_week: i.doses_per_week,
+      target_volume_ml: i.target_volume_ml,
+      notes: i.notes,
+    })),
+  });
+}
+
 export async function softDeleteProtocol(id: number): Promise<void> {
   if (!isDbAvailable()) return;
   const db = await getDb();
