@@ -11,4 +11,7 @@ export * from './doseScaling';
 export * from './consensus';
 export * from './biomarkers';
 export * from './protocolSeeds';
+export * from './personas';
+export * from './externalProtocols';
+export * from './externalProtocolData';
 export * from './types';

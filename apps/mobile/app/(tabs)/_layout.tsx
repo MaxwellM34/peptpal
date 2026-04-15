@@ -1,86 +1,26 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
-import { Text } from 'react-native';
-
-function TabIcon({ emoji, focused }: { emoji: string; focused: boolean }) {
-  return <Text style={{ fontSize: 20, opacity: focused ? 1 : 0.5 }}>{emoji}</Text>;
-}
+import { TwoRowTabBar } from '../../src/components/TwoRowTabBar';
 
 export default function TabsLayout() {
   return (
     <Tabs
+      tabBar={(props) => <TwoRowTabBar {...props} />}
       screenOptions={{
-        tabBarStyle: {
-          backgroundColor: '#1e293b',
-          borderTopColor: '#334155',
-          borderTopWidth: 1,
-          paddingBottom: 4,
-          height: 60,
-        },
-        tabBarActiveTintColor: '#3b82f6',
-        tabBarInactiveTintColor: '#64748b',
-        tabBarLabelStyle: { fontSize: 10, fontWeight: '600' },
         headerStyle: { backgroundColor: '#0f172a' },
         headerTintColor: '#fff',
         headerTitleStyle: { fontWeight: '700', fontSize: 18 },
       }}
     >
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: 'Dashboard',
-          tabBarLabel: 'Home',
-          tabBarIcon: ({ focused }) => <TabIcon emoji="🏠" focused={focused} />,
-        }}
-      />
-      <Tabs.Screen
-        name="library/index"
-        options={{
-          title: 'Peptide Library',
-          tabBarLabel: 'Library',
-          tabBarIcon: ({ focused }) => <TabIcon emoji="📚" focused={focused} />,
-        }}
-      />
-      <Tabs.Screen
-        name="log/index"
-        options={{
-          title: 'Injection Log',
-          tabBarLabel: 'Log',
-          tabBarIcon: ({ focused }) => <TabIcon emoji="💉" focused={focused} />,
-        }}
-      />
-      <Tabs.Screen
-        name="symptoms/index"
-        options={{
-          title: 'Symptoms',
-          tabBarLabel: 'Symptoms',
-          tabBarIcon: ({ focused }) => <TabIcon emoji="🔔" focused={focused} />,
-        }}
-      />
-      <Tabs.Screen
-        name="inventory/index"
-        options={{
-          title: 'Inventory',
-          tabBarLabel: 'Inventory',
-          tabBarIcon: ({ focused }) => <TabIcon emoji="🧪" focused={focused} />,
-        }}
-      />
-      <Tabs.Screen
-        name="schedule/index"
-        options={{
-          title: 'Schedule',
-          tabBarLabel: 'Schedule',
-          tabBarIcon: ({ focused }) => <TabIcon emoji="📅" focused={focused} />,
-        }}
-      />
-      <Tabs.Screen
-        name="settings/index"
-        options={{
-          title: 'Settings',
-          tabBarLabel: 'Settings',
-          tabBarIcon: ({ focused }) => <TabIcon emoji="⚙️" focused={focused} />,
-        }}
-      />
+      <Tabs.Screen name="index" options={{ title: 'Dashboard' }} />
+      <Tabs.Screen name="library/index" options={{ title: 'Peptide Library' }} />
+      <Tabs.Screen name="log/index" options={{ title: 'Injection Log' }} />
+      <Tabs.Screen name="community/index" options={{ title: 'Community' }} />
+      <Tabs.Screen name="symptoms/index" options={{ title: 'Symptoms' }} />
+      <Tabs.Screen name="inventory/index" options={{ title: 'Inventory' }} />
+      <Tabs.Screen name="schedule/index" options={{ title: 'Schedule' }} />
+      <Tabs.Screen name="settings/index" options={{ title: 'Settings' }} />
+
       {/* Hidden screens (navigated to programmatically) */}
       <Tabs.Screen name="library/[slug]" options={{ href: null }} />
       <Tabs.Screen name="library/goals" options={{ href: null }} />
@@ -93,7 +33,6 @@ export default function TabsLayout() {
       <Tabs.Screen name="schedule/new" options={{ href: null }} />
       <Tabs.Screen name="schedule/cycles" options={{ href: null }} />
       <Tabs.Screen name="biomarkers" options={{ href: null }} />
-      <Tabs.Screen name="community/index" options={{ href: null }} />
       <Tabs.Screen name="community/[slug]" options={{ href: null }} />
       <Tabs.Screen name="community/new" options={{ href: null }} />
     </Tabs>

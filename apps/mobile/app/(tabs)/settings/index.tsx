@@ -13,7 +13,7 @@ import { exportAllData, importAllData } from '../../../src/db/backup';
 import { submitCommunityReport } from '../../../src/api/client';
 import { getUserProfile, upsertUserProfile } from '../../../src/db/profile';
 import type { BackupPayload } from '../../../src/db/backup';
-import { lbsToKg, kgToLbs } from '@peptpal/core';
+import { lbsToKg, kgToLbs, PERSONAS, PERSONA_ORDER, type PersonaKey } from '@peptpal/core';
 
 // Simple AES-256 encryption using expo-crypto for key derivation.
 // The actual encryption uses a symmetric key derived from the passphrase.
@@ -51,6 +51,7 @@ export default function SettingsScreen() {
   const [heightIn, setHeightIn] = useState('');
   const [age, setAge] = useState('');
   const [sex, setSex] = useState<string | null>(null);
+  const [persona, setPersona] = useState<PersonaKey | null>(null);
   const [profileSaved, setProfileSaved] = useState(false);
 
   const loadProfile = useCallback(async () => {
@@ -60,6 +61,9 @@ export default function SettingsScreen() {
       if (p.height_cm) setHeightIn((p.height_cm / 2.54).toFixed(0));
       if (p.age) setAge(String(p.age));
       if (p.sex) setSex(p.sex);
+      if (p.activity_level && (p.activity_level as PersonaKey) in PERSONAS) {
+        setPersona(p.activity_level as PersonaKey);
+      }
     }
   }, []);
 
@@ -76,6 +80,7 @@ export default function SettingsScreen() {
       height_cm: heightIn ? parseFloat(heightIn) * 2.54 : null,
       age: age ? parseInt(age, 10) : null,
       sex,
+      activity_level: persona,
     });
     setProfileSaved(true);
     setTimeout(() => setProfileSaved(false), 2000);
@@ -258,6 +263,44 @@ export default function SettingsScreen() {
                 </Text>
               </TouchableOpacity>
             ))}
+          </View>
+
+          {/* Persona selector */}
+          <View className="mt-4">
+            <Text className="text-slate-300 text-xs font-semibold mb-2">
+              What's your approach?
+            </Text>
+            <Text className="text-slate-500 text-[10px] mb-3 leading-4">
+              Drives the dose range shown on protocols. You can change this anytime.
+            </Text>
+            <View className="gap-2">
+              {PERSONA_ORDER.map((k) => {
+                const p = PERSONAS[k];
+                const active = persona === k;
+                return (
+                  <TouchableOpacity
+                    key={k}
+                    className={`rounded-xl p-3 border flex-row items-center ${
+                      active
+                        ? 'bg-primary-900/40 border-primary-700'
+                        : 'bg-surface-elevated border-surface-border'
+                    }`}
+                    onPress={() => setPersona(k)}
+                  >
+                    <Text style={{ fontSize: 22 }}>{p.emoji}</Text>
+                    <View className="flex-1 ml-3">
+                      <Text className={`font-semibold text-sm ${active ? 'text-primary-200' : 'text-slate-200'}`}>
+                        {p.label}
+                      </Text>
+                      <Text className="text-slate-500 text-[10px] leading-4 mt-0.5">
+                        {p.description}
+                      </Text>
+                    </View>
+                    {active && <Text className="text-primary-400 text-sm">✓</Text>}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
           </View>
 
           <View className="mt-4">

@@ -9,6 +9,17 @@ export interface UserProfile {
   activity_level: string | null;
 }
 
+/**
+ * Persona key lives in activity_level for now — avoids a schema migration
+ * and the column has no other consumers yet. If activity_level gets its own
+ * use later, promote persona to its own column.
+ */
+export type StoredPersona =
+  | 'health_optimizer'
+  | 'bodybuilder'
+  | 'cautious_beginner'
+  | 'risk_tolerant';
+
 export async function getUserProfile(): Promise<UserProfile | null> {
   if (!isDbAvailable()) return null;
   const db = await getDb();
