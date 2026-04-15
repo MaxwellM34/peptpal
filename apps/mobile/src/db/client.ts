@@ -1,6 +1,7 @@
 import { Platform } from 'react-native';
 import {
   CREATE_TABLES_SQL,
+  CREATE_INDEXES_SQL,
   SCHEMA_VERSION,
   MIGRATIONS_V1_TO_V2,
   MIGRATIONS_V2_TO_V3,
@@ -23,14 +24,12 @@ export async function getDb(): Promise<AnyDb> {
 }
 
 async function initDb(database: AnyDb): Promise<void> {
+  // Phase 1: tables only. Indexes referencing migration-added columns must wait.
   await database.execAsync(CREATE_TABLES_SQL);
+
   const row = await database.getFirstAsync<{ version: number }>(
     'SELECT version FROM schema_version LIMIT 1',
   );
-  if (!row) {
-    await database.runAsync('INSERT INTO schema_version (version) VALUES (?)', [SCHEMA_VERSION]);
-    return;
-  }
 
   async function runMigration(stmts: string[]) {
     for (const stmt of stmts) {
@@ -47,12 +46,20 @@ async function initDb(database: AnyDb): Promise<void> {
     }
   }
 
-  if (row.version < 2) await runMigration(MIGRATIONS_V1_TO_V2);
-  if (row.version < 3) await runMigration(MIGRATIONS_V2_TO_V3);
+  if (!row) {
+    await database.runAsync('INSERT INTO schema_version (version) VALUES (?)', [SCHEMA_VERSION]);
+  } else {
+    // Phase 2: migrations bring existing schemas up to current.
+    if (row.version < 2) await runMigration(MIGRATIONS_V1_TO_V2);
+    if (row.version < 3) await runMigration(MIGRATIONS_V2_TO_V3);
 
-  if (row.version < SCHEMA_VERSION) {
-    await database.runAsync('UPDATE schema_version SET version = ?', [SCHEMA_VERSION]);
+    if (row.version < SCHEMA_VERSION) {
+      await database.runAsync('UPDATE schema_version SET version = ?', [SCHEMA_VERSION]);
+    }
   }
+
+  // Phase 3: indexes (now that all columns exist).
+  await database.execAsync(CREATE_INDEXES_SQL);
 }
 
 export async function closeDb(): Promise<void> {

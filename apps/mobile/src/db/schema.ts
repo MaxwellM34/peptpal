@@ -154,6 +154,19 @@ CREATE TABLE IF NOT EXISTS biomarker_readings (
   deleted_at    TEXT
 );
 
+`;
+
+/**
+ * Indexes are created separately from CREATE_TABLES_SQL.
+ *
+ * Why: CREATE INDEX validates that the column exists. If a new migration
+ * adds a column (e.g. batch_id), and we put the corresponding index in the
+ * shared CREATE_TABLES_SQL, existing databases will fail the index statement
+ * before migrations have had a chance to add the column.
+ *
+ * Order in initDb: tables → migrations → indexes.
+ */
+export const CREATE_INDEXES_SQL = `
 CREATE INDEX IF NOT EXISTS idx_peptides_log_injected_at ON peptides_log(injected_at);
 CREATE INDEX IF NOT EXISTS idx_peptides_log_peptide_ref_id ON peptides_log(peptide_ref_id);
 CREATE INDEX IF NOT EXISTS idx_symptoms_log_occurred_at ON symptoms_log(occurred_at);
