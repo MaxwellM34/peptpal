@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { format } from 'date-fns';
 import { Badge, DegradationChart } from '@peptpal/ui';
+import { useTutorialHotspot } from '../../../src/lib/tutorialContext';
 import {
   estimateRemainingDoses,
   remainingPotency,
@@ -58,6 +59,7 @@ const statusBadgeVariant: Record<InventoryStatus, 'default' | 'success' | 'warni
 export default function InventoryScreen() {
   const router = useRouter();
   const [items, setItems] = useState<InventoryItem[]>([]);
+  const receiveHotspot = useTutorialHotspot('inventory.receive_button');
 
   const load = useCallback(async () => {
     const data = await getInventoryItems();
@@ -76,7 +78,12 @@ export default function InventoryScreen() {
           <View className="flex-row gap-2 mb-4">
             <TouchableOpacity
               className="flex-1 bg-primary-600 rounded-xl py-3 items-center active:bg-primary-700"
-              onPress={() => router.push('/(tabs)/inventory/receive' as never)}
+              ref={receiveHotspot.ref}
+              onLayout={receiveHotspot.onLayout}
+              onPress={() => {
+                receiveHotspot.onPress();
+                router.push('/(tabs)/inventory/receive' as never);
+              }}
             >
               <Text className="text-white font-bold">📦 Receive Shipment</Text>
             </TouchableOpacity>

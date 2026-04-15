@@ -13,6 +13,7 @@ import { exportAllData, importAllData } from '../../../src/db/backup';
 import { submitCommunityReport } from '../../../src/api/client';
 import { getUserProfile, upsertUserProfile } from '../../../src/db/profile';
 import { resetTutorial } from '../../../src/db/tutorial';
+import { useTutorial, useTutorialHotspot } from '../../../src/lib/tutorialContext';
 import type { BackupPayload } from '../../../src/db/backup';
 import { lbsToKg, kgToLbs, PERSONAS, PERSONA_ORDER, type PersonaKey } from '@peptpal/core';
 
@@ -48,6 +49,9 @@ function xorDecrypt(encoded: string, key: string): string {
 
 export default function SettingsScreen() {
   const router = useRouter();
+  const { start: startTutorial } = useTutorial();
+  const weightHotspot = useTutorialHotspot('settings.weight_input');
+  const personaHotspot = useTutorialHotspot('settings.persona_list');
   const [weightLbs, setWeightLbs] = useState('');
   const [heightIn, setHeightIn] = useState('');
   const [age, setAge] = useState('');
@@ -221,7 +225,12 @@ export default function SettingsScreen() {
             Weight-adjusted dose scaling uses this. Never leaves your device.
           </Text>
           <View className="flex-row gap-2">
-            <View className="flex-1">
+            <View
+              className="flex-1"
+              ref={weightHotspot.ref}
+              onLayout={weightHotspot.onLayout}
+              collapsable={false}
+            >
               <TextInput
                 label="Weight (lb) *"
                 placeholder="170"
@@ -274,7 +283,12 @@ export default function SettingsScreen() {
             <Text className="text-slate-500 text-[10px] mb-3 leading-4">
               Drives the dose range shown on protocols. You can change this anytime.
             </Text>
-            <View className="gap-2">
+            <View
+              className="gap-2"
+              ref={personaHotspot.ref}
+              onLayout={personaHotspot.onLayout}
+              collapsable={false}
+            >
               {PERSONA_ORDER.map((k) => {
                 const p = PERSONAS[k];
                 const active = persona === k;
@@ -439,7 +453,7 @@ export default function SettingsScreen() {
             variant="secondary"
             onPress={async () => {
               await resetTutorial();
-              router.push('/tutorial');
+              startTutorial();
             }}
           >
             Replay Tutorial

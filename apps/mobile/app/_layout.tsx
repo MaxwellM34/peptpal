@@ -10,11 +10,11 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { isDbAvailable, getDb } from '../src/db/client';
 import { getTutorialState } from '../src/db/tutorial';
 import { DisclaimerModal } from './modals/disclaimer';
-import { useRouter } from 'expo-router';
+import { TutorialProvider, useTutorial } from '../src/lib/tutorialContext';
+import { TutorialOverlay } from '../src/components/TutorialOverlay';
 
 const isWeb = Platform.OS === 'web';
 
-// SplashScreen is native-only
 if (!isWeb) {
   SplashScreen.preventAutoHideAsync();
 }
@@ -31,8 +31,7 @@ const queryClient = new QueryClient({
 const DISCLAIMER_KEY = 'disclaimer_acknowledged_v1';
 
 export default function RootLayout() {
-  const router = useRouter();
-  const [ready, setReady] = useState(isWeb); // web skips init gate
+  const [ready, setReady] = useState(isWeb);
   const [showDisclaimer, setShowDisclaimer] = useState(false);
   const [needsTutorial, setNeedsTutorial] = useState(false);
 
@@ -43,7 +42,6 @@ export default function RootLayout() {
           await getDb();
         }
 
-        // SecureStore is native-only; use localStorage on web
         let ack: string | null = null;
         if (isWeb) {
           ack = typeof localStorage !== 'undefined'
@@ -54,15 +52,11 @@ export default function RootLayout() {
             const SecureStore = await import('expo-secure-store');
             ack = await SecureStore.getItemAsync(DISCLAIMER_KEY);
           } catch {
-            // Keychain can fail if device locked / Expo Go startup race.
-            // Treat as unseen so user re-acks rather than crashing boot.
             ack = null;
           }
         }
 
-        if (!ack) {
-          setShowDisclaimer(true);
-        }
+        if (!ack) setShowDisclaimer(true);
 
         if (isDbAvailable()) {
           const t = await getTutorialState();
@@ -70,21 +64,11 @@ export default function RootLayout() {
         }
       } finally {
         setReady(true);
-        if (!isWeb) {
-          await SplashScreen.hideAsync();
-        }
+        if (!isWeb) await SplashScreen.hideAsync();
       }
     }
     void init();
   }, []);
-
-  // Push to tutorial once ready, disclaimer ack'd, and tutorial not completed.
-  useEffect(() => {
-    if (ready && !showDisclaimer && needsTutorial) {
-      router.push('/tutorial');
-      setNeedsTutorial(false); // prevent re-triggering during session
-    }
-  }, [ready, showDisclaimer, needsTutorial, router]);
 
   async function handleDisclaimerAck() {
     if (isWeb) {
@@ -94,7 +78,7 @@ export default function RootLayout() {
         const SecureStore = await import('expo-secure-store');
         await SecureStore.setItemAsync(DISCLAIMER_KEY, 'true');
       } catch {
-        // Non-fatal — user acknowledged in-session.
+        // non-fatal
       }
     }
     setShowDisclaimer(false);
@@ -106,34 +90,46 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <QueryClientProvider client={queryClient}>
-          <StatusBar style="light" />
-          <View className="flex-1 bg-surface">
-            <Stack
-              screenOptions={{
-                headerStyle: { backgroundColor: '#0f172a' },
-                headerTintColor: '#fff',
-                headerTitleStyle: { fontWeight: '700' },
-                contentStyle: { backgroundColor: '#0f172a' },
-              }}
-            >
-              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-              <Stack.Screen
-                name="modals/dose-warning"
-                options={{ presentation: 'modal', title: 'Dose Warning' }}
-              />
-              <Stack.Screen
-                name="modals/reconstitution-calc"
-                options={{ presentation: 'modal', title: 'Reconstitution Calculator' }}
-              />
-              <Stack.Screen
-                name="tutorial"
-                options={{ headerShown: false, presentation: 'fullScreenModal' }}
-              />
-            </Stack>
-          </View>
-          <DisclaimerModal visible={showDisclaimer} onAcknowledge={handleDisclaimerAck} />
+          <TutorialProvider>
+            <StatusBar style="light" />
+            <View className="flex-1 bg-surface">
+              <Stack
+                screenOptions={{
+                  headerStyle: { backgroundColor: '#0f172a' },
+                  headerTintColor: '#fff',
+                  headerTitleStyle: { fontWeight: '700' },
+                  contentStyle: { backgroundColor: '#0f172a' },
+                }}
+              >
+                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                <Stack.Screen
+                  name="modals/dose-warning"
+                  options={{ presentation: 'modal', title: 'Dose Warning' }}
+                />
+                <Stack.Screen
+                  name="modals/reconstitution-calc"
+                  options={{ presentation: 'modal', title: 'Reconstitution Calculator' }}
+                />
+              </Stack>
+            </View>
+            <TutorialAutoStart enabled={!showDisclaimer && needsTutorial} onStarted={() => setNeedsTutorial(false)} />
+            <DisclaimerModal visible={showDisclaimer} onAcknowledge={handleDisclaimerAck} />
+            <TutorialOverlay />
+          </TutorialProvider>
         </QueryClientProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );
+}
+
+/** Kicks off the tutorial once the disclaimer is dismissed and first-run is detected. */
+function TutorialAutoStart({ enabled, onStarted }: { enabled: boolean; onStarted: () => void }) {
+  const { start, active } = useTutorial();
+  useEffect(() => {
+    if (enabled && !active) {
+      start();
+      onStarted();
+    }
+  }, [enabled, active, start, onStarted]);
+  return null;
 }

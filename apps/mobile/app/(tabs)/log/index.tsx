@@ -4,12 +4,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { format } from 'date-fns';
 import { Badge } from '@peptpal/ui';
+import { useTutorialHotspot } from '../../../src/lib/tutorialContext';
 import { getInjectionLogs, softDeleteInjectionLog } from '../../../src/db/injectionLog';
 import type { InjectionLog } from '@peptpal/core';
 
 export default function LogHistoryScreen() {
   const router = useRouter();
   const [logs, setLogs] = useState<InjectionLog[]>([]);
+  const levelsHotspot = useTutorialHotspot('log.levels_button');
 
   const load = useCallback(async () => {
     const data = await getInjectionLogs();
@@ -39,7 +41,12 @@ export default function LogHistoryScreen() {
             </TouchableOpacity>
             <TouchableOpacity
               className="bg-surface-card border border-surface-border rounded-xl py-3 px-3 items-center active:bg-surface-elevated"
-              onPress={() => router.push('/(tabs)/log/chart')}
+              ref={levelsHotspot.ref}
+              onLayout={levelsHotspot.onLayout}
+              onPress={() => {
+                levelsHotspot.onPress();
+                router.push('/(tabs)/log/chart');
+              }}
             >
               <Text className="text-slate-200 font-semibold">📈 Levels</Text>
             </TouchableOpacity>

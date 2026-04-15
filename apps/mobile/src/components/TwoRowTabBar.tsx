@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useRef, useCallback } from 'react';
 import { View, Text, TouchableOpacity, Platform } from 'react-native';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTutorial } from '../lib/tutorialContext';
 
 /**
  * Two-row tab bar: 4 tabs per row. Designed to fit 8 tabs on iPhone without
@@ -10,19 +11,23 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
  * Maps the Tabs route names to emoji + label metadata. Unknown tabs fall back
  * to the route name.
  */
-const TAB_META: Record<string, { label: string; emoji: string; row: 0 | 1 }> = {
-  'index':           { label: 'Home',      emoji: '🏠', row: 0 },
-  'library/index':   { label: 'Library',   emoji: '📚', row: 0 },
-  'log/index':       { label: 'Log',       emoji: '💉', row: 0 },
-  'community/index': { label: 'Community', emoji: '💬', row: 0 },
-  'symptoms/index':  { label: 'Symptoms',  emoji: '🔔', row: 1 },
-  'inventory/index': { label: 'Inventory', emoji: '🧪', row: 1 },
-  'schedule/index':  { label: 'Schedule',  emoji: '📅', row: 1 },
-  'settings/index':  { label: 'Settings',  emoji: '⚙️', row: 1 },
+const TAB_META: Record<
+  string,
+  { label: string; emoji: string; row: 0 | 1; hotspotId?: string }
+> = {
+  'index':           { label: 'Home',      emoji: '🏠', row: 0, hotspotId: 'tab.home' },
+  'library/index':   { label: 'Library',   emoji: '📚', row: 0, hotspotId: 'tab.library' },
+  'log/index':       { label: 'Log',       emoji: '💉', row: 0, hotspotId: 'tab.log' },
+  'community/index': { label: 'Community', emoji: '💬', row: 0, hotspotId: 'tab.community' },
+  'symptoms/index':  { label: 'Symptoms',  emoji: '🔔', row: 1, hotspotId: 'tab.symptoms' },
+  'inventory/index': { label: 'Inventory', emoji: '🧪', row: 1, hotspotId: 'tab.inventory' },
+  'schedule/index':  { label: 'Schedule',  emoji: '📅', row: 1, hotspotId: 'tab.schedule' },
+  'settings/index':  { label: 'Settings',  emoji: '⚙️', row: 1, hotspotId: 'tab.settings' },
 };
 
 export function TwoRowTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
+  const { registerHotspot, onHotspotTapped, active: tutorialActive } = useTutorial();
 
   const visibleRoutes = state.routes.filter((r) => {
     const options = descriptors[r.key]?.options;
@@ -56,7 +61,25 @@ export function TwoRowTabBar({ state, descriptors, navigation }: BottomTabBarPro
                 key={route.key}
                 accessibilityRole="button"
                 accessibilityState={focused ? { selected: true } : {}}
+                onLayout={(e) => {
+                  if (meta.hotspotId && tutorialActive) {
+                    const { x, y, width, height } = e.nativeEvent.layout;
+                    // onLayout gives layout-local coords; measure window to be accurate.
+                    // Schedule a measureInWindow on the next tick.
+                    setTimeout(() => {
+                      const node = e.target as unknown as { measureInWindow?: (cb: (wx: number, wy: number, w: number, h: number) => void) => void };
+                      if (node?.measureInWindow) {
+                        node.measureInWindow((wx, wy, ww, wh) => {
+                          if (ww > 0) registerHotspot(meta.hotspotId!, { x: wx, y: wy, width: ww, height: wh });
+                        });
+                      } else {
+                        registerHotspot(meta.hotspotId!, { x, y, width, height });
+                      }
+                    }, 50);
+                  }
+                }}
                 onPress={() => {
+                  if (meta.hotspotId) onHotspotTapped(meta.hotspotId);
                   const event = navigation.emit({
                     type: 'tabPress',
                     target: route.key,
