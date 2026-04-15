@@ -1,5 +1,5 @@
-import React, { useCallback, useRef, useState } from 'react';
-import { View, Text, FlatList, TouchableOpacity } from 'react-native';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
+import { View, Text, FlatList, TouchableOpacity, TextInput as RNTextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { format } from 'date-fns';
@@ -12,7 +12,7 @@ import {
   buildDegradationCurve,
   doseCompensationMultiplier,
 } from '@peptpal/core';
-import { getInventoryItems, softDeleteInventoryItem } from '../../../src/db/inventory';
+import { getInventoryItems } from '../../../src/db/inventory';
 import type { InventoryItem } from '@peptpal/core';
 
 type InventoryStatus = 'Sealed' | 'Fresh' | 'Stable' | 'Aging' | 'Low' | 'Degraded' | 'Expired';
@@ -56,9 +56,13 @@ const statusBadgeVariant: Record<InventoryStatus, 'default' | 'success' | 'warni
   Expired: 'danger',
 };
 
+type SortKey = 'recent' | 'peptide' | 'status';
+
 export default function InventoryScreen() {
   const router = useRouter();
   const [items, setItems] = useState<InventoryItem[]>([]);
+  const [query, setQuery] = useState('');
+  const [sortKey, setSortKey] = useState<SortKey>('recent');
   const receiveHotspot = useTutorialHotspot('inventory.receive_button');
   const listRef = useRef<FlatList<InventoryItem>>(null);
   useTutorialScrollReset(listRef);
@@ -70,32 +74,95 @@ export default function InventoryScreen() {
 
   useFocusEffect(useCallback(() => { void load(); }, [load]));
 
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    let rows = items.filter((i) => !i.deleted_at);
+    if (q) {
+      rows = rows.filter(
+        (i) =>
+          i.peptide_name.toLowerCase().includes(q) ||
+          ((i as InventoryItem & { batch_number?: string | null }).batch_number ?? '').toLowerCase().includes(q) ||
+          ((i as InventoryItem & { vendor?: string | null }).vendor ?? '').toLowerCase().includes(q),
+      );
+    }
+    if (sortKey === 'peptide') {
+      rows = [...rows].sort((a, b) => a.peptide_name.localeCompare(b.peptide_name));
+    } else if (sortKey === 'status') {
+      const order: Record<InventoryStatus, number> = {
+        Degraded: 0,
+        Expired: 0,
+        Aging: 1,
+        Low: 2,
+        Fresh: 3,
+        Stable: 4,
+        Sealed: 5,
+      };
+      rows = [...rows].sort((a, b) => order[getStatus(a).status] - order[getStatus(b).status]);
+    } else {
+      rows = [...rows].sort((a, b) => b.created_at.localeCompare(a.created_at));
+    }
+    return rows;
+  }, [items, query, sortKey]);
+
   return (
     <SafeAreaView className="flex-1 bg-surface" edges={['bottom']}>
       <FlatList
         ref={listRef}
-        data={items}
+        data={filtered}
         keyExtractor={(item) => String(item.id)}
         contentContainerStyle={{ padding: 16 }}
         ListHeaderComponent={
-          <View className="flex-row gap-2 mb-4">
-            <TouchableOpacity
-              className="flex-1 bg-primary-600 rounded-xl py-3 items-center active:bg-primary-700"
-              ref={receiveHotspot.ref}
-              onLayout={receiveHotspot.onLayout}
-              onPress={() => {
-                receiveHotspot.onPress();
-                router.push('/(tabs)/inventory/receive' as never);
-              }}
-            >
-              <Text className="text-white font-bold">📦 Receive Shipment</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              className="bg-surface-card border border-surface-border rounded-xl py-3 px-3 items-center active:bg-surface-elevated"
-              onPress={() => router.push('/(tabs)/inventory/new' as never)}
-            >
-              <Text className="text-slate-200 font-semibold">+ Single Vial</Text>
-            </TouchableOpacity>
+          <View className="mb-4">
+            <View className="flex-row gap-2 mb-3">
+              <TouchableOpacity
+                className="flex-1 bg-primary-600 rounded-xl py-3 items-center active:bg-primary-700"
+                ref={receiveHotspot.ref}
+                onLayout={receiveHotspot.onLayout}
+                onPress={() => {
+                  receiveHotspot.onPress();
+                  router.push('/(tabs)/inventory/receive' as never);
+                }}
+              >
+                <Text className="text-white font-bold">📦 Receive Shipment</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                className="bg-surface-card border border-surface-border rounded-xl py-3 px-3 items-center active:bg-surface-elevated"
+                onPress={() => router.push('/(tabs)/inventory/new' as never)}
+              >
+                <Text className="text-slate-200 font-semibold">+ Single</Text>
+              </TouchableOpacity>
+            </View>
+
+            <RNTextInput
+              className="bg-surface-elevated border border-surface-border rounded-xl px-4 py-2.5 text-white text-sm mb-2"
+              placeholder="Search peptide, vendor, batch…"
+              placeholderTextColor="#64748b"
+              value={query}
+              onChangeText={setQuery}
+            />
+
+            <View className="flex-row gap-2">
+              <Text className="text-slate-400 text-xs self-center">Sort:</Text>
+              {(['recent', 'peptide', 'status'] as SortKey[]).map((k) => (
+                <TouchableOpacity
+                  key={k}
+                  className={`px-3 py-1 rounded-full border ${
+                    sortKey === k
+                      ? 'bg-primary-600 border-primary-500'
+                      : 'bg-surface-elevated border-surface-border'
+                  }`}
+                  onPress={() => setSortKey(k)}
+                >
+                  <Text
+                    className={`text-[11px] capitalize font-medium ${
+                      sortKey === k ? 'text-white' : 'text-slate-300'
+                    }`}
+                  >
+                    {k}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
         }
         renderItem={({ item }) => {
