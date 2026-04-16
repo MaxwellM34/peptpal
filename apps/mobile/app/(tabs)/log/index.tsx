@@ -1,11 +1,13 @@
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
-import { View, Text, FlatList, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, ScrollView, Animated, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
+import { Swipeable } from 'react-native-gesture-handler';
 import { format } from 'date-fns';
 import { Badge } from '@peptpal/ui';
 import { useTutorialHotspot, useTutorialScrollReset } from '../../../src/lib/tutorialContext';
 import { getInjectionLogs, softDeleteInjectionLog } from '../../../src/db/injectionLog';
+import { hapticWarn, hapticSuccess } from '../../../src/lib/haptics';
 import type { InjectionLog } from '@peptpal/core';
 
 export default function LogHistoryScreen() {
@@ -36,7 +38,20 @@ export default function LogHistoryScreen() {
 
   async function handleDelete(id: number) {
     await softDeleteInjectionLog(id);
+    void hapticSuccess();
     await load();
+  }
+
+  function confirmDelete(id: number, peptideName: string) {
+    void hapticWarn();
+    Alert.alert(
+      `Delete ${peptideName}?`,
+      'Soft-deleted; can be recovered manually from SQLite if needed.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: () => handleDelete(id) },
+      ],
+    );
   }
 
   return (
@@ -108,7 +123,13 @@ export default function LogHistoryScreen() {
           )}
           </View>
         }
-        renderItem={({ item }) => <LogItem log={item} onDelete={() => handleDelete(item.id)} />}
+        renderItem={({ item }) => (
+          <LogItem
+            log={item}
+            onDelete={() => handleDelete(item.id)}
+            onSwipeDelete={() => confirmDelete(item.id, item.peptide_name)}
+          />
+        )}
         ListEmptyComponent={
           <View className="items-center py-16">
             <Text className="text-slate-500 text-base">No injections logged yet</Text>
@@ -120,10 +141,49 @@ export default function LogHistoryScreen() {
   );
 }
 
-function LogItem({ log, onDelete }: { log: InjectionLog; onDelete: () => void }) {
+function LogItem({
+  log,
+  onDelete,
+  onSwipeDelete,
+}: {
+  log: InjectionLog;
+  onDelete: () => void;
+  onSwipeDelete: () => void;
+}) {
   const [expanded, setExpanded] = useState(false);
 
   return (
+    <Swipeable
+      friction={2}
+      rightThreshold={48}
+      renderRightActions={(progress) => {
+        const scale = progress.interpolate({
+          inputRange: [0, 1],
+          outputRange: [0.6, 1],
+          extrapolate: 'clamp',
+        });
+        return (
+          <View
+            style={{
+              backgroundColor: '#7f1d1d',
+              justifyContent: 'center',
+              alignItems: 'center',
+              width: 100,
+              marginBottom: 12,
+              borderTopRightRadius: 16,
+              borderBottomRightRadius: 16,
+            }}
+          >
+            <Animated.Text
+              style={{ color: 'white', fontWeight: '700', fontSize: 13, transform: [{ scale }] }}
+            >
+              Delete
+            </Animated.Text>
+          </View>
+        );
+      }}
+      onSwipeableOpen={() => onSwipeDelete()}
+    >
     <TouchableOpacity
       className="bg-surface-card rounded-2xl mb-3 overflow-hidden"
       onPress={() => setExpanded(!expanded)}
@@ -159,6 +219,7 @@ function LogItem({ log, onDelete }: { log: InjectionLog; onDelete: () => void })
         </View>
       )}
     </TouchableOpacity>
+    </Swipeable>
   );
 }
 
