@@ -126,7 +126,7 @@ export default function ReceiveShipment() {
       <Stack.Screen options={{ title: 'Receive Shipment' }} />
       <SafeAreaView className="flex-1 bg-surface" edges={['bottom']}>
         <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-          <ScrollView className="flex-1 px-4 pt-4" keyboardShouldPersistTaps="handled">
+          <ScrollView className="flex-1 px-4 pt-4" keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
             <StepHeader step={step} />
 
             {step === 1 && (

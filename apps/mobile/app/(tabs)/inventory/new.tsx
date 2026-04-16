@@ -89,7 +89,7 @@ export default function NewInventoryScreen() {
       <Stack.Screen options={{ title: 'Add Vial' }} />
       <SafeAreaView className="flex-1 bg-surface" edges={['bottom']}>
         <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-          <ScrollView className="flex-1 px-4 pt-4" keyboardShouldPersistTaps="handled">
+          <ScrollView className="flex-1 px-4 pt-4" keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
 
             <View className="mb-4">
               <Text className="text-slate-300 text-sm font-medium mb-1.5">Peptide *</Text>

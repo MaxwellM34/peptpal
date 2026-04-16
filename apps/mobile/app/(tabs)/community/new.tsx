@@ -92,7 +92,7 @@ export default function NewPost() {
       <Stack.Screen options={{ title: `Share ${seed?.name ?? ''}` }} />
       <SafeAreaView className="flex-1 bg-surface" edges={['bottom']}>
         <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-          <ScrollView className="flex-1 px-4 pt-4" keyboardShouldPersistTaps="handled">
+          <ScrollView className="flex-1 px-4 pt-4" keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
             <View className="bg-amber-900/20 border border-amber-800 rounded-xl p-3 mb-4">
               <Text className="text-amber-300 text-xs leading-5">
                 Evidence-tagged posts count 5× more in the consensus median. If you have bloodwork, body comp,
