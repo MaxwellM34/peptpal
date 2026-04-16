@@ -12,6 +12,9 @@ import { Card, Button, TextInput } from '@peptpal/ui';
 import { exportAllData, importAllData } from '../../../src/db/backup';
 import { getInjectionLogs } from '../../../src/db/injectionLog';
 import { getInventoryItems } from '../../../src/db/inventory';
+import { getBiomarkerReadings } from '../../../src/db/biomarkers';
+import { listProtocols, getProtocolItems } from '../../../src/db/protocols';
+import { BIOMARKERS } from '@peptpal/core';
 import { submitCommunityReport } from '../../../src/api/client';
 import { getUserProfile, upsertUserProfile } from '../../../src/db/profile';
 import { resetTutorial } from '../../../src/db/tutorial';
@@ -540,6 +543,83 @@ export default function SettingsScreen() {
               </Button>
             </View>
           </View>
+        </Card>
+
+        {/* Physician summary */}
+        <Card className="mb-4">
+          <Text className="text-white font-bold text-base mb-1">🩺 Physician Summary</Text>
+          <Text className="text-slate-400 text-xs mb-3">
+            One-page text report bundling protocols, recent injections, biomarkers, and inventory. Useful when discussing with a clinician who's open to the conversation.
+          </Text>
+          <Button
+            variant="secondary"
+            onPress={async () => {
+              const [logs, biomarkers, protocols, inv, profile] = await Promise.all([
+                getInjectionLogs({ limit: 200 }),
+                getBiomarkerReadings(),
+                listProtocols(true),
+                getInventoryItems(),
+                (await import('../../../src/db/profile')).getUserProfile(),
+              ]);
+              const lines: string[] = [];
+              lines.push('PEPTPAL — Personal Tracking Summary');
+              lines.push(`Generated ${new Date().toISOString().slice(0, 10)}`);
+              lines.push('');
+              if (profile?.weight_kg) {
+                lines.push(`Weight: ${(profile.weight_kg * 2.2046).toFixed(0)} lb (${profile.weight_kg.toFixed(1)} kg)`);
+                if (profile.age) lines.push(`Age: ${profile.age}`);
+                if (profile.sex) lines.push(`Sex: ${profile.sex}`);
+                lines.push('');
+              }
+              lines.push('=== ACTIVE PROTOCOLS ===');
+              for (const p of protocols) {
+                const items = await getProtocolItems(p.id);
+                lines.push(`• ${p.name}${p.goal ? ` (goal: ${p.goal})` : ''}`);
+                for (const i of items) {
+                  lines.push(`    - ${i.peptide_name}: ${i.dose_mcg} mcg, ${i.doses_per_week}×/week`);
+                }
+              }
+              if (protocols.length === 0) lines.push('  (none active)');
+              lines.push('');
+              lines.push('=== RECENT INJECTIONS (last 200) ===');
+              for (const l of logs.slice(0, 50)) {
+                lines.push(`${l.injected_at.slice(0, 16)}  ${l.peptide_name}  ${l.dose_mcg} mcg${l.injection_site ? ` @ ${l.injection_site.replace(/_/g, ' ')}` : ''}`);
+              }
+              if (logs.length > 50) lines.push(`... + ${logs.length - 50} more`);
+              lines.push('');
+              lines.push('=== BIOMARKERS ===');
+              const byKey = new Map<string, typeof biomarkers>();
+              for (const b of biomarkers) {
+                if (!byKey.has(b.biomarker_key)) byKey.set(b.biomarker_key, []);
+                byKey.get(b.biomarker_key)!.push(b);
+              }
+              for (const [k, rows] of byKey) {
+                const def = BIOMARKERS[k as keyof typeof BIOMARKERS];
+                if (!def) continue;
+                const sorted = [...rows].sort((a, b) => a.measured_at.localeCompare(b.measured_at));
+                const last = sorted[sorted.length - 1]!;
+                const prev = sorted.length > 1 ? sorted[sorted.length - 2] : null;
+                const trend = prev ? (last.value > prev.value ? '↑' : last.value < prev.value ? '↓' : '→') : '';
+                lines.push(`• ${def.label}: ${last.value} ${def.unit} (${last.measured_at.slice(0, 10)}) ${trend}  [ref ${def.low}–${def.high}]`);
+              }
+              if (biomarkers.length === 0) lines.push('  (no readings)');
+              lines.push('');
+              lines.push('=== INVENTORY ===');
+              for (const i of inv.filter((x) => !x.deleted_at)) {
+                const ii = i as typeof i & { label_number?: number | null; vendor?: string | null };
+                lines.push(`• ${i.peptide_name}${ii.label_number ? ` #${ii.label_number}` : ''} — ${i.vial_size_mg} mg, ${i.reconstituted ? 'reconstituted' : 'sealed'}${ii.vendor ? ` (${ii.vendor})` : ''}`);
+              }
+              lines.push('');
+              lines.push('NOTE: PeptPal is a personal-tracking app. Reference data is community-sourced and informational; many of these compounds are not FDA-approved. Confirm any clinical interpretation with the patient.');
+              const path = `${FileSystem.documentDirectory}peptpal-physician-summary-${new Date().toISOString().slice(0, 10)}.txt`;
+              await FileSystem.writeAsStringAsync(path, lines.join('\n'));
+              const canShare = await Sharing.isAvailableAsync();
+              if (canShare) await Sharing.shareAsync(path, { mimeType: 'text/plain' });
+              else Alert.alert('Saved', `Summary saved: ${path}`);
+            }}
+          >
+            Generate + Share
+          </Button>
         </Card>
 
         {/* Delete all data */}
