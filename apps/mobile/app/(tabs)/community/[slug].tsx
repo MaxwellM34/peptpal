@@ -19,6 +19,7 @@ import {
   getConsensus,
   voteOnPost,
   reportPost,
+  registerForumUser,
   type DoseLogPostOut,
   type ConsensusSnapshotOut,
 } from '../../../src/api/client';
@@ -40,6 +41,8 @@ export default function CommunityThread() {
   const [weightKg, setWeightKg] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [myUserId, setMyUserId] = useState<number | null>(null);
+  const [myOnly, setMyOnly] = useState(false);
 
   const load = useCallback(async () => {
     if (!slug) return;
@@ -52,12 +55,17 @@ export default function CommunityThread() {
       if (profile?.activity_level && (profile.activity_level as PersonaKey) in PERSONAS) {
         setPersona(profile.activity_level as PersonaKey);
       }
-      const [p, c] = await Promise.all([
+      const uuid = await getClientUuid();
+      const [p, c, me] = await Promise.all([
         listDoseLogPosts(slug),
         getConsensus(slug, w ?? undefined),
+        registerForumUser(uuid).catch(() => null),
       ]);
       setPosts(p);
       setConsensus(c);
+      if (me && typeof (me as { id?: number }).id === 'number') {
+        setMyUserId((me as { id: number }).id);
+      }
     } catch (e) {
       setError(String(e));
     } finally {
@@ -126,9 +134,12 @@ export default function CommunityThread() {
               seed={seed}
               topSnap={topSnap}
               weightKg={weightKg}
-              posts={posts}
+              posts={myOnly && myUserId != null ? posts.filter((p) => p.user_id === myUserId) : posts}
               loading={loading}
               error={error}
+              myUserId={myUserId}
+              myOnly={myOnly}
+              onToggleMyOnly={() => setMyOnly((v) => !v)}
               onUpvote={(id) => handleVote(id, 1)}
               onDownvote={(id) => handleVote(id, -1)}
               onReport={handleReport}
@@ -156,6 +167,9 @@ function InternalTab({
   posts,
   loading,
   error,
+  myUserId,
+  myOnly,
+  onToggleMyOnly,
   onUpvote,
   onDownvote,
   onReport,
@@ -167,6 +181,9 @@ function InternalTab({
   posts: DoseLogPostOut[];
   loading: boolean;
   error: string | null;
+  myUserId: number | null;
+  myOnly: boolean;
+  onToggleMyOnly: () => void;
   onUpvote: (id: number) => void;
   onDownvote: (id: number) => void;
   onReport: (id: number) => void;
@@ -240,7 +257,23 @@ function InternalTab({
         </View>
       )}
 
-      <Text className="text-slate-200 font-bold mb-2">Recent dose logs</Text>
+      <View className="flex-row justify-between items-center mb-2">
+        <Text className="text-slate-200 font-bold">Recent dose logs</Text>
+        {myUserId != null && (
+          <TouchableOpacity
+            className={`px-3 py-1 rounded-full border ${
+              myOnly
+                ? 'bg-primary-600 border-primary-500'
+                : 'bg-surface-elevated border-surface-border'
+            }`}
+            onPress={onToggleMyOnly}
+          >
+            <Text className={`text-[11px] font-medium ${myOnly ? 'text-white' : 'text-slate-300'}`}>
+              {myOnly ? 'Only mine' : 'Show mine'}
+            </Text>
+          </TouchableOpacity>
+        )}
+      </View>
 
       {posts.length === 0 && !loading && (
         <View className="bg-surface-card rounded-2xl p-6 items-center">
