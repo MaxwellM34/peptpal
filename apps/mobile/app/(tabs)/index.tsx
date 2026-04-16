@@ -12,6 +12,7 @@ import { getInventoryItems } from '../../src/db/inventory';
 import { computeDashboardAlerts, type DashboardAlert } from '../../src/lib/dashboardAlerts';
 import { predictNextDose, formatTimeUntil, type NextDose } from '../../src/lib/nextDose';
 import { listProtocols, getProtocolItems, type ProtocolRow, type ProtocolItemRow } from '../../src/db/protocols';
+import { getCycleMetadata, computeCycleStatus } from '@peptpal/core';
 import type { InjectionLog, SymptomLog, Schedule, InventoryItem } from '@peptpal/core';
 
 export default function DashboardScreen() {
@@ -146,6 +147,51 @@ export default function DashboardScreen() {
             )}
           </View>
         )}
+
+        {/* Cycle countdowns */}
+        {schedules.length > 0 && (() => {
+          const cycling = schedules
+            .map((s) => {
+              const slug = s.peptide_name
+                .toLowerCase()
+                .replace(/\s*\(.*?\)\s*/g, '')
+                .trim()
+                .replace(/[^a-z0-9]+/g, '-');
+              const meta = getCycleMetadata(slug);
+              if (!meta.requiresCycling || meta.maxWeeksOn == null) return null;
+              const status = computeCycleStatus(s.start_date, meta);
+              return { schedule: s, meta, status };
+            })
+            .filter((x): x is NonNullable<typeof x> => x !== null);
+          if (cycling.length === 0) return null;
+          return (
+            <TouchableOpacity
+              className="bg-surface-card rounded-2xl p-3 mb-4 border border-surface-border"
+              onPress={() => router.push('/(tabs)/schedule/cycles')}
+            >
+              <View className="flex-row justify-between items-center mb-2">
+                <Text className="text-slate-400 text-[10px] uppercase font-semibold">Cycle countdowns</Text>
+                <Text className="text-primary-400 text-xs">Open →</Text>
+              </View>
+              {cycling.slice(0, 3).map((c) => {
+                const remaining = Math.max(0, (c.meta.maxWeeksOn ?? 0) - c.status.weeksOn);
+                const tone =
+                  c.status.status === 'overdue' ? 'text-red-300' :
+                  c.status.status === 'warning' ? 'text-amber-300' : 'text-emerald-300';
+                return (
+                  <View key={c.schedule.id} className="flex-row justify-between py-1">
+                    <Text className="text-slate-200 text-xs font-semibold">{c.schedule.peptide_name}</Text>
+                    <Text className={`text-xs ${tone}`}>
+                      {c.status.status === 'overdue'
+                        ? `${Math.round(c.status.weeksOn - (c.meta.maxWeeksOn ?? 0))}w overdue`
+                        : `${remaining.toFixed(1)}w remaining`}
+                    </Text>
+                  </View>
+                );
+              })}
+            </TouchableOpacity>
+          );
+        })()}
 
         {/* Today's plan from active protocols */}
         {activeProtocols.length > 0 && (

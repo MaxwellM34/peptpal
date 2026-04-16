@@ -5,15 +5,18 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { format, differenceInDays } from 'date-fns';
 import { Badge } from '@peptpal/ui';
 import { getSchedules, softDeleteSchedule, updateScheduleReminder } from '../../../src/db/schedules';
+import { getActiveProtocolItems } from '../../../src/db/protocols';
 import type { Schedule } from '@peptpal/core';
 
 export default function ScheduleScreen() {
   const router = useRouter();
   const [schedules, setSchedules] = useState<Schedule[]>([]);
+  const [protocolPeptides, setProtocolPeptides] = useState<Set<string>>(new Set());
 
   const load = useCallback(async () => {
-    const data = await getSchedules();
+    const [data, items] = await Promise.all([getSchedules(), getActiveProtocolItems()]);
     setSchedules(data.filter((s) => !s.deleted_at));
+    setProtocolPeptides(new Set(items.map((i) => i.peptide_name)));
   }, []);
 
   useFocusEffect(useCallback(() => { void load(); }, [load]));
@@ -66,7 +69,14 @@ export default function ScheduleScreen() {
             <View className="bg-surface-card rounded-2xl mb-3 p-4">
               <View className="flex-row justify-between items-start mb-3">
                 <View className="flex-1">
-                  <Text className="text-white font-bold text-base">{s.peptide_name}</Text>
+                  <View className="flex-row items-center gap-2 flex-wrap">
+                    <Text className="text-white font-bold text-base">{s.peptide_name}</Text>
+                    {protocolPeptides.has(s.peptide_name) && (
+                      <View className="bg-primary-900/40 border border-primary-800 rounded-full px-2 py-0.5">
+                        <Text className="text-primary-300 text-[9px] font-semibold">FROM PROTOCOL</Text>
+                      </View>
+                    )}
+                  </View>
                   <Text className="text-slate-400 text-xs mt-0.5">
                     {s.dose_mcg} mcg{s.frequency_hours ? ` · every ${s.frequency_hours}h` : ''}
                   </Text>
