@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { format } from 'date-fns';
 import { Badge, DegradationChart } from '@peptpal/ui';
+import { MascotEmptyState } from '../../../src/components/MascotEmptyState';
 import { useTutorialHotspot, useTutorialScrollReset } from '../../../src/lib/tutorialContext';
 import {
   estimateRemainingDoses,
@@ -215,10 +216,10 @@ export default function InventoryScreen() {
           );
         }}
         ListEmptyComponent={
-          <View className="items-center py-16">
-            <Text className="text-slate-500 text-base">No inventory yet</Text>
-            <Text className="text-slate-600 text-sm mt-1">Add a vial to get started</Text>
-          </View>
+          <MascotEmptyState
+            title="No vials yet"
+            body="Tap 📦 Receive Shipment when peptides arrive in the mail. I'll auto-label them and remind you when potency drops."
+          />
         }
       />
     </SafeAreaView>

@@ -163,7 +163,13 @@ export default function PeptideDetailScreen() {
               className="flex-1 bg-primary-600 rounded-xl py-3 items-center active:bg-primary-700"
               onPress={() => router.push('/modals/reconstitution-calc')}
             >
-              <Text className="text-white font-semibold">🧮 Reconstitution Calc</Text>
+              <Text className="text-white font-semibold">🧮 Calc</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              className="flex-1 bg-surface-card border border-surface-border rounded-xl py-3 items-center active:bg-surface-elevated"
+              onPress={() => router.push({ pathname: '/(tabs)/library/compare', params: { a: peptide.slug } })}
+            >
+              <Text className="text-slate-200 font-semibold">⇆ Compare</Text>
             </TouchableOpacity>
           </View>
 

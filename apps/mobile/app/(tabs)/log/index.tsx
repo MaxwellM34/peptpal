@@ -8,6 +8,7 @@ import { Badge } from '@peptpal/ui';
 import { useTutorialHotspot, useTutorialScrollReset } from '../../../src/lib/tutorialContext';
 import { getInjectionLogs, softDeleteInjectionLog } from '../../../src/db/injectionLog';
 import { hapticWarn, hapticSuccess } from '../../../src/lib/haptics';
+import { MascotEmptyState } from '../../../src/components/MascotEmptyState';
 import type { InjectionLog } from '@peptpal/core';
 
 export default function LogHistoryScreen() {
@@ -131,10 +132,10 @@ export default function LogHistoryScreen() {
           />
         )}
         ListEmptyComponent={
-          <View className="items-center py-16">
-            <Text className="text-slate-500 text-base">No injections logged yet</Text>
-            <Text className="text-slate-600 text-sm mt-1">Tap the button above to get started</Text>
-          </View>
+          <MascotEmptyState
+            title="Log your first injection"
+            body="Tap + Log Injection above. I'll track FIFO, dose scaling, AE severity, and feed the level chart."
+          />
         }
       />
     </SafeAreaView>

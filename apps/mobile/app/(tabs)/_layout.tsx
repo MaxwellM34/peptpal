@@ -25,6 +25,7 @@ export default function TabsLayout() {
       <Tabs.Screen name="library/[slug]" options={{ href: null }} />
       <Tabs.Screen name="library/goals" options={{ href: null }} />
       <Tabs.Screen name="library/blends" options={{ href: null }} />
+      <Tabs.Screen name="library/compare" options={{ href: null }} />
       <Tabs.Screen name="log/new" options={{ href: null }} />
       <Tabs.Screen name="log/chart" options={{ href: null }} />
       <Tabs.Screen name="log/sites" options={{ href: null }} />

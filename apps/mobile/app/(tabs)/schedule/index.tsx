@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { format, differenceInDays } from 'date-fns';
 import { Badge } from '@peptpal/ui';
+import { MascotEmptyState } from '../../../src/components/MascotEmptyState';
 import { getSchedules, softDeleteSchedule, updateScheduleReminder } from '../../../src/db/schedules';
 import { getActiveProtocolItems } from '../../../src/db/protocols';
 import type { Schedule } from '@peptpal/core';
@@ -127,9 +128,10 @@ export default function ScheduleScreen() {
           );
         }}
         ListEmptyComponent={
-          <View className="items-center py-16">
-            <Text className="text-slate-500 text-base">No schedules yet</Text>
-          </View>
+          <MascotEmptyState
+            title="No schedules yet"
+            body="Build a 🧬 Protocol to auto-generate schedules, or hit + New Schedule for a single peptide."
+          />
         }
       />
     </SafeAreaView>
