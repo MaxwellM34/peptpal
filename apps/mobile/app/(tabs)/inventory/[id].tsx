@@ -21,6 +21,7 @@ import {
 } from '../../../src/db/inventory';
 import { getInjectionLogs } from '../../../src/db/injectionLog';
 import { resolvePhotoUri } from '../../../src/lib/photos';
+import { PhotoViewerModal } from '../../../src/components/PhotoViewerModal';
 import { usePeptideList } from '../../../src/hooks/usePeptides';
 import type { InventoryItem, InjectionLog } from '@peptpal/core';
 
@@ -270,6 +271,7 @@ function slugifyPeptideName(name: string): string {
 }
 
 function VialDetailPanel({ item, vialLogs }: { item: InventoryItem; vialLogs: InjectionLog[] }) {
+  const [viewerIndex, setViewerIndex] = useState<number | null>(null);
   const photos = (() => {
     const raw = (item as InventoryItem & { photos_json?: string | null }).photos_json;
     if (!raw) return [] as string[];
@@ -306,15 +308,22 @@ function VialDetailPanel({ item, vialLogs }: { item: InventoryItem; vialLogs: In
         <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-3">
           <View className="flex-row gap-2">
             {photos.map((p, i) => (
-              <Image
-                key={i}
-                source={{ uri: resolvePhotoUri(p) }}
-                style={{ width: 80, height: 80, borderRadius: 8 }}
-              />
+              <TouchableOpacity key={i} onPress={() => setViewerIndex(i)}>
+                <Image
+                  source={{ uri: resolvePhotoUri(p) }}
+                  style={{ width: 80, height: 80, borderRadius: 8 }}
+                />
+              </TouchableOpacity>
             ))}
           </View>
         </ScrollView>
       )}
+      <PhotoViewerModal
+        visible={viewerIndex != null}
+        photos={photos}
+        initialIndex={viewerIndex ?? 0}
+        onClose={() => setViewerIndex(null)}
+      />
 
       {/* Degradation chart */}
       {item.reconstituted && daysRecon != null && (

@@ -7,6 +7,7 @@ import { Card, Badge } from '@peptpal/ui';
 import { getBatch, parsePhotos, type BatchRow } from '../../../../src/db/batches';
 import { getInventoryItems } from '../../../../src/db/inventory';
 import { resolvePhotoUri } from '../../../../src/lib/photos';
+import { PhotoViewerModal } from '../../../../src/components/PhotoViewerModal';
 import type { InventoryItem } from '@peptpal/core';
 
 export default function BatchDetail() {
@@ -14,6 +15,7 @@ export default function BatchDetail() {
   const router = useRouter();
   const [batch, setBatch] = useState<BatchRow | null>(null);
   const [vials, setVials] = useState<InventoryItem[]>([]);
+  const [viewerIndex, setViewerIndex] = useState<number | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -47,15 +49,22 @@ export default function BatchDetail() {
               <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mt-3">
                 <View className="flex-row gap-2">
                   {photos.map((p, i) => (
-                    <Image
-                      key={i}
-                      source={{ uri: resolvePhotoUri(p) }}
-                      style={{ width: 110, height: 110, borderRadius: 10 }}
-                    />
+                    <TouchableOpacity key={i} onPress={() => setViewerIndex(i)}>
+                      <Image
+                        source={{ uri: resolvePhotoUri(p) }}
+                        style={{ width: 110, height: 110, borderRadius: 10 }}
+                      />
+                    </TouchableOpacity>
                   ))}
                 </View>
               </ScrollView>
             )}
+            <PhotoViewerModal
+              visible={viewerIndex != null}
+              photos={photos}
+              initialIndex={viewerIndex ?? 0}
+              onClose={() => setViewerIndex(null)}
+            />
           </Card>
 
           <Text className="text-slate-200 font-bold mb-2">
