@@ -5,10 +5,18 @@ import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { format } from 'date-fns';
 import { Card, Badge } from '@peptpal/ui';
 import { getBatch, parsePhotos, type BatchRow } from '../../../../src/db/batches';
+import { getDb, isDbAvailable } from '../../../../src/db/client';
 import { getInventoryItems } from '../../../../src/db/inventory';
-import { resolvePhotoUri } from '../../../../src/lib/photos';
+import { resolvePhotoUri, pickFromCamera, pickFromLibrary } from '../../../../src/lib/photos';
 import { PhotoViewerModal } from '../../../../src/components/PhotoViewerModal';
 import type { InventoryItem } from '@peptpal/core';
+
+async function addPhotoToBatch(batch: BatchRow, filename: string): Promise<void> {
+  if (!isDbAvailable()) return;
+  const db = await getDb();
+  const next = [...parsePhotos(batch.photos_json), filename];
+  await db.runAsync(`UPDATE batches SET photos_json = ? WHERE id = ?`, [JSON.stringify(next), batch.id]);
+}
 
 export default function BatchDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -65,6 +73,30 @@ export default function BatchDetail() {
               initialIndex={viewerIndex ?? 0}
               onClose={() => setViewerIndex(null)}
             />
+            <View className="flex-row gap-2 mt-3">
+              <TouchableOpacity
+                className="flex-1 bg-surface-elevated border border-surface-border rounded-xl py-2 items-center"
+                onPress={async () => {
+                  const r = await pickFromCamera();
+                  if (!r) return;
+                  await addPhotoToBatch(batch, r.filename);
+                  setBatch({ ...batch, photos_json: JSON.stringify([...photos, r.filename]) });
+                }}
+              >
+                <Text className="text-slate-200 text-xs font-semibold">📷 Add photo</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                className="flex-1 bg-surface-elevated border border-surface-border rounded-xl py-2 items-center"
+                onPress={async () => {
+                  const r = await pickFromLibrary();
+                  if (!r) return;
+                  await addPhotoToBatch(batch, r.filename);
+                  setBatch({ ...batch, photos_json: JSON.stringify([...photos, r.filename]) });
+                }}
+              >
+                <Text className="text-slate-200 text-xs font-semibold">🖼 From library</Text>
+              </TouchableOpacity>
+            </View>
           </Card>
 
           <Text className="text-slate-200 font-bold mb-2">
