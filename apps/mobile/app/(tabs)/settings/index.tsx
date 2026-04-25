@@ -671,13 +671,23 @@ export default function SettingsScreen() {
           </Button>
         </Card>
 
+        {/* Feedback */}
+        <Card className="mb-4">
+          <Text className="text-white font-bold text-base mb-1">Send Feedback</Text>
+          <Text className="text-slate-400 text-xs leading-5 mb-3">
+            Report a bug, suggest a feature, or just share thoughts. Every message is read.
+          </Text>
+          <Button onPress={() => router.push('/modals/feedback')} variant="secondary">
+            Send feedback
+          </Button>
+        </Card>
+
         {/* About */}
         <Card className="mb-4">
           <Text className="text-white font-bold text-base mb-1">About</Text>
           <Text className="text-slate-400 text-xs leading-5">
             PeptPal · harm-reduction for peptide users · built in the open.{'\n'}
-            Evidence engine, consensus math, degradation model — all open source.{'\n'}
-            Report bugs or suggest features via the repository.
+            Evidence engine, consensus math, degradation model — all open source.
           </Text>
         </Card>
 

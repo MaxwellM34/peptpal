@@ -116,6 +116,10 @@ export default function RootLayout() {
                   name="modals/reconstitution-calc"
                   options={{ presentation: 'modal', title: 'Reconstitution Calculator' }}
                 />
+                <Stack.Screen
+                  name="modals/feedback"
+                  options={{ presentation: 'modal', title: 'Send Feedback' }}
+                />
               </Stack>
             </View>
             <TutorialAutoStart

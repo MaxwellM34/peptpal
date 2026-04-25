@@ -165,3 +165,30 @@ export async function getConsensus(peptide_slug: string, weight_kg?: number, goa
   if (goal) params.set('goal', goal);
   return getJson<ConsensusSnapshotOut[]>(`/api/forum/consensus?${params.toString()}`);
 }
+
+// ─── Feedback API ─────────────────────────────────────────────────────────────
+
+export type FeedbackCategory = 'bug' | 'feature' | 'general';
+
+export interface FeedbackOut {
+  id: number;
+  category: string;
+  body: string;
+  email: string | null;
+  client_uuid: string | null;
+  app_version: string | null;
+  platform: string | null;
+  status: string;
+  created_at: string;
+}
+
+export async function submitFeedback(payload: {
+  category: FeedbackCategory;
+  body: string;
+  email?: string;
+  client_uuid?: string;
+  app_version?: string;
+  platform?: string;
+}): Promise<FeedbackOut> {
+  return postJson<FeedbackOut>(`/api/feedback`, payload);
+}

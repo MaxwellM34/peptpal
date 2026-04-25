@@ -141,7 +141,7 @@ export function TutorialOverlay() {
       >
         <View style={{ flexDirection: 'row', alignItems: 'flex-end' }}>
           <View style={{ marginRight: -10 }}>
-            <PeptPalMascot size={110} bonesmash />
+            <PeptPalMascot size={110} bonesmash mirrored />
           </View>
           <View style={{ flex: 1 }}>
             <SpeechBubble>

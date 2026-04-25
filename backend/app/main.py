@@ -3,15 +3,13 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
-from slowapi.util import get_remote_address
 from tortoise.contrib.fastapi import RegisterTortoise
 
 from app.config import settings, TORTOISE_ORM
-from app.routers import admin, community, forum, peptides
-
-limiter = Limiter(key_func=get_remote_address)
+from app.limiter import limiter
+from app.routers import admin, community, feedback, forum, peptides
 
 
 @asynccontextmanager
@@ -55,6 +53,7 @@ async def rate_limit_submissions(request: Request, call_next):
 app.include_router(peptides.router)
 app.include_router(community.router)
 app.include_router(forum.router)
+app.include_router(feedback.router)
 app.include_router(admin.router)
 
 
