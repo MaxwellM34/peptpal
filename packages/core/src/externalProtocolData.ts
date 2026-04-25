@@ -1,53 +1,41 @@
 /**
  * Compiled external-consensus seed data per (peptide × persona).
  *
- * Sourced from reddit top-voted threads (r/Peptides, r/PeptideSciences,
- * r/tirzepatidecompound, r/Retatrutide, r/Nootropics, r/steroids peptide
- * crossover threads), peer-reviewed literature, and peptide.org aggregator.
+ * ⚠️  CITATION SAFETY NOTICE  ⚠️
+ * The URL arrays passed to `sourcesFromUrls()` below were LLM-generated and
+ * are NOT VERIFIED. At least one was confirmed by the user to point to
+ * unrelated content. Until each URL is manually verified, `sourcesFromUrls()`
+ * intentionally IGNORES the urls and returns a single "unverified" placeholder
+ * Source so we never display fabricated citations to users.
  *
- * Every entry is a snapshot of the public community consensus — expect drift.
- * Treat these as cold-start seeds, not prescriptions. When PeptPal users post
- * enough structured dose logs (≥5 in a weight bracket), the ConsensusSnapshot
- * supersedes this.
+ * The DOSE RANGES, FREQUENCIES, and RATIONALES below are general community
+ * knowledge and are kept — but they should be treated as informational
+ * starting points only, never as cited evidence. The on-app trust-tier UI
+ * will show the placeholder only.
  *
- * Data compiled via research-agent synthesis of 68 peptide × persona combos.
- * Refresh cadence: quarterly, or whenever a major trial publishes.
+ * To restore real citations: verify each URL manually (visit, confirm topic
+ * matches), then replace `sourcesFromUrls()` with the original mapping
+ * function (preserved in git history). Do NOT regenerate URLs with an LLM.
  */
 
 import type { ExternalProtocolMap } from './externalProtocols';
 import { installExternalProtocols } from './externalProtocols';
 import type { Source, SourceTier } from './trustTiers';
 
-function redditSrc(url: string, title: string): Source {
-  return { tier: 'C' as SourceTier, title, url };
-}
-function pubmedSrc(url: string, title: string): Source {
-  return { tier: 'A' as SourceTier, title, url, notes: 'Peer-reviewed trial data.' };
-}
-function aggregatorSrc(url: string, title: string): Source {
-  return { tier: 'C-' as SourceTier, title, url };
-}
-
-function sourcesFromUrls(urls: string[]): Source[] {
-  return urls.map((u) => {
-    if (u.includes('pubmed') || u.includes('nejm.org')) {
-      return pubmedSrc(u, 'Peer-reviewed literature');
-    }
-    if (u.includes('examine.com')) {
-      return { tier: 'B' as SourceTier, title: 'Examine.com evidence review', url: u };
-    }
-    if (u.includes('reddit.com')) {
-      const sub = u.split('/r/')[1]?.split('/')[0] ?? 'reddit';
-      return redditSrc(u, `r/${sub} top-voted thread`);
-    }
-    if (u.includes('peptides.org')) {
-      return aggregatorSrc(u, 'peptides.org reference');
-    }
-    if (u.includes('thinksteroids.com')) {
-      return redditSrc(u, 'ThinkSteroids forum thread');
-    }
-    return { tier: 'C-' as SourceTier, title: 'Reference', url: u };
-  });
+/**
+ * Returns an "unverified" placeholder rather than mapping the URLs.
+ * The `_urls` parameter is preserved so the data structure stays intact and
+ * we can come back later, manually verify each, and re-enable mapping.
+ */
+function sourcesFromUrls(_urls: string[]): Source[] {
+  return [
+    {
+      tier: 'C-' as SourceTier,
+      title: 'Evidence pending manual verification',
+      notes:
+        'Citation links for this peptide × persona are being re-verified. Treat the dose range as a starting point, not as cited evidence.',
+    },
+  ];
 }
 
 export const EXTERNAL_PROTOCOL_DATA: Record<string, ExternalProtocolMap> = {
